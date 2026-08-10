@@ -12,15 +12,23 @@ shows nothing but byte counts. This skill rebuilds genuine diffs.
 `impact`, `search`, `show`). Never mxcli write/`exec`. Studio Pro may stay open — the scripts
 read a separate worktree copy and will stop themselves if that copy is ever locked.
 
+## Step 0 — prerequisites
+
+This skill drives scripts that are **not** bundled with it. Resolve and check them first:
+
 ```bash
 MXDIFF="${MXDIFF_HOME:-$HOME/.claude/mxdiff}"
+bash "$MXDIFF/doctor.sh"     # also checks git, node 18+, mxcli, mxlint 3.17+
 ```
 
-## Step 0 — verify the environment (first run on a machine/project)
+If that path does not exist, **stop and tell the user.** Installing is `git clone` of the
+`mendix-change-toolkit` bundle then `bash install.sh` (Windows:
+`powershell -ExecutionPolicy Bypass -File install.ps1`), which installs to `~/.claude/mxdiff/`
+and applies to every project on the machine. Ask the user for the repo URL if you don't have it.
 
-```bash
-bash "$MXDIFF/doctor.sh"
-```
+**Never fall back to `git diff`, `git show`, or reading the `.mpr` directly.** Mendix stores its
+model in binaries; any "diff" produced that way is meaningless or invented. No toolkit, no
+review — say so rather than guessing.
 
 ## Step 1 — settle the range
 

@@ -11,14 +11,27 @@ incomplete or wrong about scope.
 **Safety:** read-only mxcli commands only. Studio Pro may stay open; the scripts read a separate
 worktree copy.
 
+## Step 0 — prerequisites
+
+This skill drives scripts that are **not** bundled with it:
+
 ```bash
 MXDIFF="${MXDIFF_HOME:-$HOME/.claude/mxdiff}"
+bash "$MXDIFF/doctor.sh"     # also checks git, node 18+, mxcli, mxlint 3.17+
 ```
+
+If that path does not exist, **stop and tell the user.** Installing is `git clone` of the
+`mendix-change-toolkit` bundle then `bash install.sh` (Windows:
+`powershell -ExecutionPolicy Bypass -File install.ps1`), which installs to `~/.claude/mxdiff/`
+and applies to every project on the machine. Ask the user for the repo URL if you don't have it.
+
+**Never fall back to `git diff`, `git show`, or reading the `.mpr` directly.** Mendix stores its
+model in binaries; any "diff" produced that way is meaningless or invented — and test steps
+derived from it would be fiction. No toolkit, no test instructions.
 
 ## Step 1 — establish what changed
 
 ```bash
-bash "$MXDIFF/doctor.sh"                                    # first run only
 git log --oneline --all --grep="CLE-123"                    # commits for a ticket
 bash "$MXDIFF/build-history.sh" '<oldest>^..<newest>'       # ~30s per commit, incremental
 bash "$MXDIFF/review.sh" '<oldest>..<newest>' --summary

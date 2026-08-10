@@ -13,16 +13,35 @@ step and it then happens once.
 `impact`, `search`, `show`). Never mxcli write/`exec`. Studio Pro may stay open — the scripts read
 a separate worktree copy and stop themselves if that copy is ever locked.
 
+---
+
+## Phase 0 — prerequisites
+
+This skill drives scripts that are **not** bundled with it. Resolve and check them first:
+
 ```bash
 MXDIFF="${MXDIFF_HOME:-$HOME/.claude/mxdiff}"
+bash "$MXDIFF/doctor.sh"     # also checks git, node 18+, mxcli, mxlint 3.17+
 ```
+
+If that path does not exist, **stop and tell the user.** Installing is `git clone` of the
+`mendix-change-toolkit` bundle then `bash install.sh` (Windows:
+`powershell -ExecutionPolicy Bypass -File install.ps1`), which installs to `~/.claude/mxdiff/`
+and applies to every project on the machine. Ask the user for the repo URL if you don't have it.
+
+`doctor.sh` also flags two project-level things worth fixing before you start: `.mendix-cache`
+not being git-ignored (add `/.mendix-cache/`), and a missing `mprcontents/` (pre-Mendix 10.18,
+so `sweep.sh` is unavailable — the YAML and MDL paths still work).
+
+**Never fall back to `git diff`, `git show`, or reading the `.mpr` directly.** Mendix stores its
+model in binaries; any "diff" produced that way is meaningless or invented, and all three
+deliverables built on it would be fiction. No toolkit, no report.
 
 ---
 
 ## Phase 1 — collect (once)
 
 ```bash
-bash "$MXDIFF/doctor.sh"          # first run on a machine/project
 git status -sb && git log --oneline -20
 ```
 
