@@ -4,7 +4,7 @@
 # is plain `git diff` - which is what makes combining many commits work.
 #
 #   bash build-history.sh <rev-list-args...>
-#   bash build-history.sh 41df7067^..HEAD
+#   bash build-history.sh <baseSha>^..HEAD
 #   bash build-history.sh HEAD~5..HEAD
 #
 # Incremental: re-running only adds commits that are not already tagged.

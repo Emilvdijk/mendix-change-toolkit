@@ -1,6 +1,6 @@
 ---
 name: mendix-test-instructions
-description: Write test instructions for Mendix changes, derived from what actually changed in the commits rather than guesswork. Use whenever the user wants test steps, a test plan, test cases, acceptance/QA instructions, a regression checklist, or "how do we test this" for a Mendix project — for a single commit, a story/ticket like CLE-123, a release, a branch, or everything they are about to pull. Reconstructs the real diff from the binary .mpr/.mxunit files, traces how a user reaches the changed logic, and produces numbered, executable steps with preconditions, roles and expected results.
+description: Write test instructions for Mendix changes, derived from what actually changed in the commits rather than guesswork. Use whenever the user wants test steps, a test plan, test cases, acceptance/QA instructions, a regression checklist, or "how do we test this" for a Mendix project — for a single commit, a story/ticket like TICKET-123, a release, a branch, or everything they are about to pull. Reconstructs the real diff from the binary .mpr/.mxunit files, traces how a user reaches the changed logic, and produces numbered, executable steps with preconditions, roles and expected results.
 ---
 
 # Test instructions from real Mendix changes
@@ -32,7 +32,7 @@ derived from it would be fiction. No toolkit, no test instructions.
 ## Step 1 — establish what changed
 
 ```bash
-git log --oneline --all --grep="CLE-123"                    # commits for a ticket
+git log --oneline --all --grep="TICKET-123"                    # commits for a ticket
 bash "$MXDIFF/build-history.sh" '<oldest>^..<newest>'       # ~30s per commit, incremental
 bash "$MXDIFF/review.sh" '<oldest>..<newest>' --summary
 bash "$MXDIFF/mdl-diff.sh" <oldSha> <newSha> Module.SUB_Foo Module.ACT_Bar
@@ -55,7 +55,7 @@ mxcli context -p <project>.mpr Module.SUB_Foo --depth 2
 exported model before concluding anything is unreachable:
 
 ```bash
-grep -rl "ACT_SalesInvoice_SendInvoice" .mendix-cache/model-history --include="*.yaml"
+grep -rl "ACT_MyAction" .mendix-cache/model-history --include="*.yaml"
 ```
 
 The hits name the pages and microflows that reference it. Walk up until you reach a page,
@@ -70,8 +70,8 @@ For changed pages/snippets, get the widget's label, bound attribute and containi
 bash "$MXDIFF/sweep.sh" <oldSha> <newSha> detail    # shows the widget path
 ```
 
-Use the human-visible caption ("LMRA Uitgevoerd?" on tab "Uitvoerings gegevens"), never the
-internal name like `radioButtons4` — a tester cannot find that.
+Use the human-visible caption and tab name as they appear on screen (e.g. "Approved?" on the
+"Execution details" tab), never the internal name like `radioButtons4` — a tester cannot find that.
 
 ## Step 3 — determine the roles needed
 

@@ -1,6 +1,6 @@
 ---
 name: mendix-change-report
-description: Produce the complete Mendix change package in one pass — code review, test instructions, and customer/team change notes — from a commit range or a story/ticket id. Use when the user wants the full picture of a Mendix change set, "everything" about a release or a story like CLE-123, a hand-off or release package, a PR write-up plus tests plus comms, or asks for more than one of review/tests/change-notes together. Also use before a release or deployment when the change set has not been analysed yet. Reconstructs real diffs from the binary .mpr/.mxunit files; costs more than the single-purpose skills because it collects once and produces all three deliverables.
+description: Produce the complete Mendix change package in one pass — code review, test instructions, and customer/team change notes — from a commit range or a story/ticket id. Use when the user wants the full picture of a Mendix change set, "everything" about a release or a story like TICKET-123, a hand-off or release package, a PR write-up plus tests plus comms, or asks for more than one of review/tests/change-notes together. Also use before a release or deployment when the change set has not been analysed yet. Reconstructs real diffs from the binary .mpr/.mxunit files; costs more than the single-purpose skills because it collects once and produces all three deliverables.
 ---
 
 # Complete Mendix change package
@@ -48,7 +48,7 @@ git status -sb && git log --oneline -20
 **Settle the range and say what you chose.** By ticket:
 
 ```bash
-git log --oneline --all --grep="CLE-123"
+git log --oneline --all --grep="TICKET-123"
 ```
 
 If those commits are **contiguous**, use `<oldest>^..<newest>` — git then combines them and

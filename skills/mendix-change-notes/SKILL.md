@@ -1,6 +1,6 @@
 ---
 name: mendix-change-notes
-description: Write customer- or team-facing change notes / release notes for Mendix changes, based on the real model diff rather than commit messages. Use whenever the user wants to communicate what changed in a Mendix project to non-developers — release notes, changelog, sprint/demo summary, "what do I tell the customer", "write it up for the team", deployment notes, or a summary of what a release or story (e.g. CLE-123) contains. Translates binary .mpr/.mxunit diffs into plain-language impact, and flags data-loss, migration and disabled-behaviour consequences that must be communicated.
+description: Write customer- or team-facing change notes / release notes for Mendix changes, based on the real model diff rather than commit messages. Use whenever the user wants to communicate what changed in a Mendix project to non-developers — release notes, changelog, sprint/demo summary, "what do I tell the customer", "write it up for the team", deployment notes, or a summary of what a release or story (e.g. TICKET-123) contains. Translates binary .mpr/.mxunit diffs into plain-language impact, and flags data-loss, migration and disabled-behaviour consequences that must be communicated.
 ---
 
 # Customer / team change notes from real Mendix changes
@@ -30,7 +30,7 @@ did not happen and miss the ones that did.
 ## Step 1 — get the real change set
 
 ```bash
-git log --oneline --all --grep="CLE-123"                 # commits for a story
+git log --oneline --all --grep="TICKET-123"                 # commits for a story
 git log --oneline <oldest>..<newest>                     # what the authors said
 bash "$MXDIFF/build-history.sh" '<oldest>^..<newest>'    # ~30s per commit, incremental
 bash "$MXDIFF/review.sh" '<oldest>..<newest>' --summary  # what actually changed
@@ -45,8 +45,7 @@ discrepancy is itself worth reporting to the team.
 
 Group by **feature or screen**, never by commit or by document. One feature usually spans a
 page, several microflows and a domain-model change; the reader cares about the feature. A
-cluster of new documents sharing a prefix (`*WorkOrderPlanner*`, `*Document*`) is one feature,
-not fifteen changes.
+cluster of new documents sharing a name prefix is one feature, not fifteen changes.
 
 Sort by user impact, not technical size. A one-line editability change on a compliance field can
 matter more than a 13,000-line new page.

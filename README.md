@@ -103,32 +103,32 @@ expensive step and it happens once instead of three times.
 
 ## 4. Using the tools directly
 
-Run from inside the Mendix project. **Close Studio Pro first** — mxcli can corrupt an open
-project. Only read-only mxcli commands are used.
+Run from inside the Mendix project. Only read-only mxcli commands are used. **Studio Pro may stay
+open** — the scripts read a separate worktree copy, and they abort if that copy is ever locked.
 
 ```bash
 MXDIFF=~/.claude/mxdiff
 
 # once per range: replay commits into a YAML git mirror (~30s/commit, incremental)
-bash $MXDIFF/build-history.sh '41df7067^..HEAD'
+bash $MXDIFF/build-history.sh '<baseSha>^..HEAD'
 
 # what changed - combined across the whole range
-bash $MXDIFF/review.sh 41df7067..HEAD --summary
+bash $MXDIFF/review.sh <baseSha>..HEAD --summary
 
 # non-contiguous commits: per-commit breakdown, reveals hotspots
-bash $MXDIFF/review.sh 5c202a17 7a3f3685 174a0aaf --summary
+bash $MXDIFF/review.sh <sha1> <sha2> <sha3> --summary
 
 # just the document names, for scripting
-bash $MXDIFF/review.sh 41df7067..HEAD --docs
+bash $MXDIFF/review.sh <baseSha>..HEAD --docs
 
 # readable before/after logic (pass several docs; checkouts are shared)
-bash $MXDIFF/mdl-diff.sh 41df7067 HEAD Project.SUB_WorkOrder_Save
+bash $MXDIFF/mdl-diff.sh <baseSha> HEAD MyModule.SUB_MyFlow
 
 # lint only the changed documents
-bash $MXDIFF/lint-diff.sh 41df7067 HEAD
+bash $MXDIFF/lint-diff.sh <baseSha> HEAD
 
 # raw BSON ground truth - no export, no worktree needed
-bash $MXDIFF/sweep.sh 41df7067 HEAD detail
+bash $MXDIFF/sweep.sh <baseSha> HEAD detail
 ```
 
 ### How it works

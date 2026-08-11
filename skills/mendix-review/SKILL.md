@@ -1,6 +1,6 @@
 ---
 name: mendix-review
-description: Code-review Mendix changes across one or more git commits. Use whenever the user wants to review, inspect, audit, or understand what changed in a Mendix project between commits, branches, or since a given commit — including "what did this commit do", "review the last N commits", "review all commits for CLE-123 / this story / this ticket", "what's in this PR", "what am I about to pull", "diff these commits". Mendix commits look empty in git (Bin NNN -> NNN bytes), so this skill reconstructs real, readable diffs from the .mpr/.mxunit binaries. Also use when a Mendix change needs risk assessment before deploying (domain-model migrations, security role changes, disabled or unreachable logic).
+description: Code-review Mendix changes across one or more git commits. Use whenever the user wants to review, inspect, audit, or understand what changed in a Mendix project between commits, branches, or since a given commit — including "what did this commit do", "review the last N commits", "review all commits for TICKET-123 / this story / this ticket", "what's in this PR", "what am I about to pull", "diff these commits". Mendix commits look empty in git (Bin NNN -> NNN bytes), so this skill reconstructs real, readable diffs from the .mpr/.mxunit binaries. Also use when a Mendix change needs risk assessment before deploying (domain-model migrations, security role changes, disabled or unreachable logic).
 ---
 
 # Review Mendix changes across commits
@@ -41,7 +41,7 @@ git status -sb && git log --oneline -20
 **By ticket/story** — the usual case:
 
 ```bash
-git log --oneline --all --grep="CLE-378"
+git log --oneline --all --grep="TICKET-123"
 ```
 
 Check whether those commits are **contiguous**. If they are, the range is `<oldest>^..<newest>`

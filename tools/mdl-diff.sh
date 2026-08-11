@@ -2,7 +2,7 @@
 # Readable before/after logic diff for specific documents, using mxcli's nested MDL.
 # Run this after review.sh has told you WHICH documents changed.
 #
-#   bash mdl-diff.sh <shaA> <shaB> Project.SUB_WorkOrder_Save [More.Docs...]
+#   bash mdl-diff.sh <shaA> <shaB> MyModule.SUB_MyFlow [More.Docs...]
 #
 # MDL is properly nested, uses real variable names, and does not renumber labels,
 # so the diff shows only the semantic change. Canvas coordinates are stripped.
