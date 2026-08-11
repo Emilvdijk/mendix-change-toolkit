@@ -21,10 +21,15 @@ MXDIFF="${MXDIFF_HOME:-$HOME/.claude/mxdiff}"
 bash "$MXDIFF/doctor.sh"     # also checks git, node 18+, mxcli, mxlint 3.17+
 ```
 
-If that path does not exist, **stop and tell the user.** Installing is `git clone` of the
-`mendix-change-toolkit` bundle then `bash install.sh` (Windows:
-`powershell -ExecutionPolicy Bypass -File install.ps1`), which installs to `~/.claude/mxdiff/`
-and applies to every project on the machine. Ask the user for the repo URL if you don't have it.
+If that path does not exist, **stop and tell the user** and offer to install it:
+
+```bash
+git clone https://github.com/Emilvdijk/mendix-change-toolkit.git
+cd mendix-change-toolkit && bash install.sh   # Windows: install.ps1 via PowerShell
+```
+
+That installs to `~/.claude/mxdiff/` and applies to every project on the machine. The repo is
+private: if the clone fails with a permission error, the user needs to be granted access to it.
 
 **Never fall back to `git diff`, `git show`, or reading the `.mpr` directly.** Mendix stores its
 model in binaries; any "diff" produced that way is meaningless or invented. No toolkit, no

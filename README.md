@@ -56,6 +56,8 @@ bash ~/.claude/mxdiff/doctor.sh
 ## 2. Install the toolkit
 
 ```bash
+git clone https://github.com/Emilvdijk/mendix-change-toolkit.git
+cd mendix-change-toolkit
 bash install.sh
 ```
 
@@ -77,9 +79,10 @@ bash install.sh --project
 Re-running is safe; it overwrites only its own files. To install elsewhere, set
 `MXDIFF_HOME` to wherever the `mxdiff` folder ended up.
 
-**Sharing with your team:** put this folder in a git repo they can clone, and have each
-person run `install.sh`. Note that many Mendix projects git-ignore `/.claude`, so a
-project-local install will not travel through the project repo by itself.
+**Sharing with your team:** this repo is **private** — grant access, then each person clones it
+and runs `install.sh`. Note that many Mendix projects git-ignore `/.claude`, so a project-local
+install will not travel through the project repo by itself. `git pull && bash install.sh` picks
+up later updates.
 
 ---
 

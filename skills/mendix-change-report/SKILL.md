@@ -24,10 +24,15 @@ MXDIFF="${MXDIFF_HOME:-$HOME/.claude/mxdiff}"
 bash "$MXDIFF/doctor.sh"     # also checks git, node 18+, mxcli, mxlint 3.17+
 ```
 
-If that path does not exist, **stop and tell the user.** Installing is `git clone` of the
-`mendix-change-toolkit` bundle then `bash install.sh` (Windows:
-`powershell -ExecutionPolicy Bypass -File install.ps1`), which installs to `~/.claude/mxdiff/`
-and applies to every project on the machine. Ask the user for the repo URL if you don't have it.
+If that path does not exist, **stop and tell the user** and offer to install it:
+
+```bash
+git clone https://github.com/Emilvdijk/mendix-change-toolkit.git
+cd mendix-change-toolkit && bash install.sh   # Windows: install.ps1 via PowerShell
+```
+
+That installs to `~/.claude/mxdiff/` and applies to every project on the machine. The repo is
+private: if the clone fails with a permission error, the user needs to be granted access to it.
 
 `doctor.sh` also flags two project-level things worth fixing before you start: `.mendix-cache`
 not being git-ignored (add `/.mendix-cache/`), and a missing `mprcontents/` (pre-Mendix 10.18,
