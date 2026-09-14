@@ -125,6 +125,27 @@ read the YAML instead:
 bash "$MXDIFF/review.sh" '<oldest>..<newest>'
 ```
 
+**The YAML does not tell you which event a handler is on.** For event handlers it exports
+`Moment: Before | After` and nothing about the event *type* — commit, delete, create,
+rollback. So "is this an after-**commit** handler or an after-**delete** handler?" cannot be
+answered from the export, and the two have opposite consequences: one runs on every save, the
+other only when the object goes away.
+
+This is the failure mode worth naming, because the YAML looks complete: `Moment: After` reads
+like a full answer, so the question never gets asked and the review states the wrong event
+with full confidence. A real review did exactly that and the claim had to be withdrawn.
+
+When the event type matters to a finding, confirm it against ground truth before reporting:
+
+```bash
+bash "$MXDIFF/sweep.sh" <oldSha> <newSha> detail      # raw BSON, no export in the way
+mxcli describe -p .mendix-cache/mxdiff-worktree/YourApp.mpr Module.EventHandler
+```
+
+The general rule: **the YAML is the authority for what it exports and silent about what it
+does not.** Silence is not absence. If a property you need is missing from the export rather
+than empty in it, go to BSON or mxcli rather than inferring.
+
 New documents have no "before", so `mdl-diff` prints the full definition. For big new microflows
 read the current state directly:
 
