@@ -79,7 +79,7 @@ bash install.sh --project
 Re-running is safe; it overwrites only its own files. To install elsewhere, set
 `MXDIFF_HOME` to wherever the `mxdiff` folder ended up.
 
-**Sharing with your team:** this repo is **private** — grant access, then each person clones it
+**Sharing with your team:** Each person clones it
 and runs `install.sh`. Note that many Mendix projects git-ignore `/.claude`, so a project-local
 install will not travel through the project repo by itself. `git pull && bash install.sh` picks
 up later updates.
