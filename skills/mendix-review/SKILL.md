@@ -76,6 +76,27 @@ Changed documents by module with `+/-` magnitude. Renames appear as `{A => B}` �
 those as an unrelated delete plus add. Large `+/-` on a page is usually layout; small `+/-` on a
 microflow is often the real behaviour change.
 
+**Subtract the export noise before counting anything.** Two artefacts routinely inflate the
+table several-fold, and both are tooling, not model change:
+
+- `+1/-1` rows whose only changed line is `pseudocode:` — the toolkit moved between storing
+  pseudocode in a sibling `.flow.txt` and inlining it. Same for every `.flow.txt` in the diff.
+- `R100 {X => X_TRUNCATED_<hash>_}` at `+0/-0` — the long-filename truncation scheme changed.
+
+Say how many documents survive the filter. On one real range this was 340 → 98.
+
+**Then declare the plan before reading anything.** Count the behaviour-bearing documents
+(microflows, nanoflows, domain models, enums, mappings — pages do not count) and state:
+
+- the range, and how many documents genuinely changed;
+- whether this is a **sweep** (aggregate risk: migrations, security, secrets, settings — fine at
+  any range size) or a **deep pass** (logic correctness — roughly 25 behaviour-bearing documents
+  before quality falls off);
+- if the range is too big for a deep pass, say so **now** and offer to split by module or ticket.
+
+Getting this wrong silently is the main failure mode of this skill: a wide range produces a
+confident-looking report that never opened two thirds of the new logic.
+
 ## Step 4 — read the logic
 
 Pass every behaviour-bearing document in one call — the worktree checkouts are the slow part and
@@ -84,6 +105,18 @@ get shared:
 ```bash
 bash "$MXDIFF/mdl-diff.sh" <oldSha> <newSha> Module.SUB_Foo Module.ACT_Bar
 ```
+
+**Read by risk class, never by diff size.** Diff magnitude is exactly the signal that does not
+exist on a new document: `+310/-0` tells you nothing about where the risk is, so added files fall
+through a magnitude-ranked review every time. Use this table instead:
+
+| Document | How much to read | Why |
+|---|---|---|
+| **New microflow / nanoflow** | **In full, always** | No "before" means no diff signal at all, and new logic is where the bugs are. Never sample these. |
+| Modified microflow / nanoflow | The logic diff, plus enough context to see which branch changed | |
+| Domain model | Structural parse: entities and attributes added/removed/retyped, persistability, access rules | Migration and security live here |
+| Enum, constant, mapping, JSON structure | Full, they are small | A single wrong enum value silently reroutes a whole flow |
+| **Page / snippet** | **Properties only** — security roles, conditional visibility, editability, data sources. Never the layout | A page diff is routinely 100k+ lines of markup with nothing behavioural in it. Skipping layout is what makes the budget work |
 
 For properties (security roles, commit/refresh flags, XPath, widget settings, attribute types)
 read the YAML instead:
@@ -99,6 +132,10 @@ read the current state directly:
 mxcli describe -p .mendix-cache/mxdiff-worktree/YourApp.mpr Module.SUB_New
 ```
 
+**Keep a worklist.** Every behaviour-bearing document ends the review as either READ or
+SKIPPED-with-a-reason. "Not read" and "read, nothing found" must never look the same in the
+output — see Reporting.
+
 ## Step 5 — quality gate scoped to the change
 
 ```bash
@@ -111,7 +148,41 @@ module, nearly all pre-existing. Report only findings that name something this c
 touched. Rules that reliably matter: `005_0001` (incomplete empty-string check), and anything
 `Error`-severity.
 
-## Step 6 — ground truth when something is unclear
+## Step 6 — mechanical invariant checks
+
+```bash
+bash "$MXDIFF/invariants.sh" '<oldest>..<newest>'          # scoped to changed documents
+bash "$MXDIFF/invariants.sh" '<oldest>..<newest>' --all    # whole model, for an audit
+```
+
+**Run this on every review, and run it before you start reading.** Reading does not scale with
+range size; checking does. These checks cost the same per document whether the range is 4
+documents or 400, so they are the only thing that stops a wider range letting more through.
+Each check exists because a real defect got past a manual review.
+
+| Check | Severity | Catches |
+|---|---|---|
+| `enum-guard-mismatch` | HIGH | A document writes `Entity.Attr = X` but every XPath guard on that same entity's attribute tests a disjoint set. Copy-paste slips that silently reroute a flow. Entity-qualified on purpose — comparing bare attribute names misfires on every `Status` in the model |
+| `cleared-association-consumed` | HIGH | A creator sets a dispatch attribute to `V` and clears association `A`, but the handler `V` dispatches to retrieves over `A`. Three documents deep, so no per-document read finds it |
+| `secret-shared-value` | HIGH | API keys and encryption keys stored as `Settings$SharedValue` — committed to the `.mpr`, therefore permanent in git |
+| `anonymous-grant` | HIGH | An entity that *newly* grants a role named `Anonymous`/`Guest` |
+| `persistent-data-removed` | HIGH | A persistable entity deleted, or an attribute dropped from one — irreversible on deploy |
+| `gate-constant-never-configured` | MEDIUM | A new Boolean constant defaulting to `False` that gates logic and is set in no configuration — the feature ships inert |
+| `guard-already-enforced` | MEDIUM | A list is re-filtered inside a loop against a condition its own retrieve XPath already enforced — dead branch plus a wasted retrieve |
+| `retrieve-nondeterministic` | MEDIUM | `SingleObject: true` with no sort order |
+| `date-format-guard-inconsistent` | MEDIUM | A document that guards some `formatDateTime*` calls against empty and leaves others bare |
+| `pair-skew` | MEDIUM | A document dominated by one domain family with a stray line referencing a rival one. Heuristic backstop for `enum-guard-mismatch` |
+| `unused-result` | LOW | A result variable assigned and never read |
+
+`cleared-association-consumed` reads the dispatch table out of the rendered `pseudocode:` block,
+so it only works on documents the toolkit has rendered pseudocode for. It is silent rather than
+wrong when that is missing.
+
+The output is **candidates, not findings**. `pair-skew` in particular is heuristic. Open every
+candidate, confirm it against the document, and drop the ones that do not hold — then report the
+survivors with evidence like any other finding. Never paste this output into a report as-is.
+
+## Step 7 — ground truth when something is unclear
 
 ```bash
 bash "$MXDIFF/sweep.sh" <oldSha> <newSha> detail
@@ -172,3 +243,19 @@ Lead with risk-ranked findings: document, what changed, why it matters, evidence
 changed-document table. Separate **confirmed defects** from **items needing the author's
 confirmation** — never present an inference about business intent as a finding. Close with a
 short list of what was clean, so the reader knows it was checked.
+
+**State coverage explicitly.** The report must end with a line of the form
+
+> Reviewed 23 of 98 changed documents. Not opened: *(list them)*.
+
+and name every behaviour-bearing document that was not read. A reader cannot tell the difference
+between "read it, it was fine" and "never opened it" unless you tell them, and the second one is
+what lets a bug reach a tester.
+
+**One row per document in the changed-document table.** Never collapse several documents into a
+single row — `BackgroundTask (new module) | 16 microflows, 2 nanoflows, 4 enums` reads as
+coverage while actually being the list of things nobody looked at. If the table gets long, group
+by module with the documents still individually listed.
+
+**A whole new module always gets its own pass.** Inside a wider range it will be summarised into
+a row and never read. Say so and offer the separate review rather than folding it in.

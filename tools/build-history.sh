@@ -73,7 +73,8 @@ for sha in $SHAS; do
   find "$MIRROR" -mindepth 1 -maxdepth 1 ! -name .git ! -name .gitattributes -exec rm -rf {} +
 
   mxlint export --config "$CFGW" >/dev/null 2>&1 || die "mxlint export failed for $sha"
-  node "$TOOLS_DIR/expand-pseudocode.js" "$MIRROR" >/dev/null
+  node "$TOOLS_DIR/expand-pseudocode.js" "$MIRROR" >/dev/null \
+    || die "expand-pseudocode.js failed for $sha (mirror commit not written)"
 
   git -C "$MIRROR" add -A >/dev/null 2>&1
   GIT_AUTHOR_NAME="${author%% <*}" \

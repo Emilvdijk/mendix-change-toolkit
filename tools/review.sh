@@ -35,9 +35,22 @@ if [ ${#ARGS[@]} -eq 1 ] && [[ "${ARGS[0]}" == *..* ]]; then
   need_tag "$ta"; need_tag "$tb"
   PAIRS+=("combined|$ta|$tb")
 else
+  # Per-commit mode diffs each commit against its REAL git parent, resolved in the
+  # Mendix repo and then mapped to that parent's mirror tag. It must not use "$t^":
+  # the mirror's parent chain is replay order, not history order, so whenever a range
+  # was built in more than one pass "$t^" is some unrelated commit and the diff is
+  # silently wrong. Measured on a real mirror: 17 of 86 tags had a mirror parent that
+  # was not the commit's actual parent.
   for sha in "${ARGS[@]}"; do
     t="$(mirror_tag "$REPO" "$sha")"; need_tag "$t"
-    PAIRS+=("$(git -C "$REPO" log -1 --format='%h %s' "$sha")|$t^|$t")
+    if parent=$(git -C "$REPO" rev-parse -q --verify "${sha}^" 2>/dev/null); then
+      pt="$(mirror_tag "$REPO" "$parent")"
+      have_tag "$pt" || die "$pt (parent of $sha) is not in the mirror - run: build-history.sh ${parent}^..${sha}"
+      from="$pt"
+    else
+      from="$t^"   # root commit: nothing before it, the mirror's empty baseline is right
+    fi
+    PAIRS+=("$(git -C "$REPO" log -1 --format='%h %s' "$sha")|$from|$t")
   done
 fi
 

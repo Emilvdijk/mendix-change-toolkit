@@ -65,10 +65,26 @@ worth raising, not something to silently include or exclude. "What I'm about to 
 ```bash
 bash "$MXDIFF/build-history.sh" '<oldest>^..<newest>'     # ~30s/commit, incremental
 bash "$MXDIFF/review.sh" '<oldest>..<newest>' --summary   # triage table
+bash "$MXDIFF/invariants.sh" '<oldest>..<newest>'         # mechanical defect checks - run BEFORE reading
 bash "$MXDIFF/review.sh" '<oldest>..<newest>'             # full YAML property diffs
 bash "$MXDIFF/lint-diff.sh" <oldSha> <newSha>             # quality gate, changed docs only
 bash "$MXDIFF/mdl-diff.sh" <oldSha> <newSha> Module.SUB_Foo Module.ACT_Bar Module.SUB_Baz
 ```
+
+**Subtract the export noise from the triage table before counting anything.** `+1/-1` rows whose
+only changed line is `pseudocode:`, every `.flow.txt`, and `R100 {X => X_TRUNCATED_<hash>_}` at
+`+0/-0` are all tooling artefacts. On one real range this took 340 documents down to 98.
+
+**`invariants.sh` is not optional here.** Reading does not scale with range size but checking
+does, and this skill is usually pointed at the widest ranges. Its output is candidates: confirm
+each against the document before it becomes a finding in Section A, a test in Section B, or a
+sentence in Section C. `cleared-association-consumed` and `enum-guard-mismatch` in particular
+describe defects that span three documents and will not be found by reading one at a time.
+
+**Read by risk class, not by diff size.** New microflows and nanoflows get read in full every
+time — a new document has no "before", so diff magnitude ranks it at the bottom exactly when it
+deserves the most attention. Pages get their properties read (security, conditional visibility,
+editability, data sources) and their layout ignored.
 
 New documents have no "before"; read their current state directly:
 
@@ -171,6 +187,13 @@ Defects introduced and fixed within the range are not release notes.
   **Needs confirmation** list at the end, addressed to the user.
 - Report faithfully: if a document could not be analysed, say which and why.
 - Draft — do not send — anything customer-facing, especially data-loss statements.
+- **State coverage.** End the Review section with `Reviewed N of M changed documents` and name
+  every behaviour-bearing document not opened. "Read it, it was fine" and "never opened it" look
+  identical to a reader otherwise, and the second is what lets a bug reach a tester.
+- **One row per document in any changed-document table.** Collapsing a module into
+  `BackgroundTask (new module) | 16 microflows, 4 enums` reads as coverage while being a list of
+  things nobody looked at. A whole new module deserves its own pass — say so rather than folding
+  it into a wider range.
 
 ## Output
 

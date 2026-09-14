@@ -40,11 +40,29 @@ derived from it would be fiction. No toolkit, no test instructions.
 git log --oneline --all --grep="TICKET-123"                    # commits for a ticket
 bash "$MXDIFF/build-history.sh" '<oldest>^..<newest>'       # ~30s per commit, incremental
 bash "$MXDIFF/review.sh" '<oldest>..<newest>' --summary
+bash "$MXDIFF/invariants.sh" '<oldest>..<newest>'           # mechanical defect checks
 bash "$MXDIFF/mdl-diff.sh" <oldSha> <newSha> Module.SUB_Foo Module.ACT_Bar
 ```
 
 You cannot write good tests without the MDL step. The diff tells you the *behaviour* that
 changed; the commit message usually does not.
+
+Ignore the export noise in the triage table: `+1/-1` rows whose only change is `pseudocode:`,
+every `.flow.txt`, and `R100 {X => X_TRUNCATED_<hash>_}` at `+0/-0` are tooling artefacts and
+have no behaviour to test.
+
+**Turn each confirmed invariant candidate into a test.** They are already phrased as a failure
+mode, which is most of the work:
+
+- `enum-guard-mismatch` / `cleared-association-consumed` → a test that runs the feature end to
+  end and checks the *effect* downstream, not just that the button reports success. Both defects
+  leave the UI looking like it worked.
+- `retrieve-nondeterministic` → a test with **two** matching rows, not one. A single-row fixture
+  passes every time and proves nothing.
+- `guard-already-enforced` → press the action twice and check nothing is duplicated.
+- `date-format-guard-inconsistent` → a record with that date left empty.
+- `gate-constant-never-configured` → confirm which environments the feature is actually on in
+  before anyone tests it, or the tester will correctly report "nothing happens".
 
 ## Step 2 — find how a user reaches the changed logic
 

@@ -46,6 +46,27 @@ Compare the two lists. Commits routinely contain changes their message does not 
 messages routinely describe intent the diff does not support. The diff wins — and the
 discrepancy is itself worth reporting to the team.
 
+**Never let export noise reach a reader.** Three artefacts in the triage table are tooling, not
+change, and describing them to a customer or a team would be pure fiction:
+
+- `+1/-1` rows whose only changed line is `pseudocode:`, and every `.flow.txt` in the diff — the
+  toolkit moved pseudocode between a sibling file and an inline field.
+- `R100 {X => X_TRUNCATED_<hash>_}` at `+0/-0` — the long-filename scheme changed. **Never
+  describe one of these as a rename**; the document was not renamed in the model.
+- A document listed with `0 change(s)` by `sweep.sh` was re-saved, not changed.
+
+On one real range this was the difference between 340 "changed documents" and 98.
+
+**A feature can be present in the model and still be off.** Before writing that something is
+available, check whether it is gated behind a constant that no configuration sets:
+
+```bash
+bash "$MXDIFF/invariants.sh" '<oldest>..<newest>' | grep gate-constant
+```
+
+A `gate-constant-never-configured` hit means the feature ships inert. Announcing it as delivered
+is the kind of error that costs trust — say it is behind a switch, and which environments have it.
+
 ## Step 2 — group by what the user experiences
 
 Group by **feature or screen**, never by commit or by document. One feature usually spans a

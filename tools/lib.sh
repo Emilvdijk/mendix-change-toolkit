@@ -53,9 +53,12 @@ warn_if_main_open() {
 }
 
 # Translate a Mendix commit-ish into the mirror repo's tag.
+# The length is pinned: bare `--short` honours core.abbrev, which git grows as the
+# repo gains objects. A mirror tagged at 8 chars would stop being found the day git
+# decided 9 were needed, silently orphaning every tag already built.
 mirror_tag() {
   local repo="$1" sha="$2"
-  echo "mx-$(git -C "$repo" rev-parse --short "$sha")"
+  echo "mx-$(git -C "$repo" rev-parse --short=8 "$sha")"
 }
 
 mirror_dir() { echo "$(cache_dir)/model-history"; }
