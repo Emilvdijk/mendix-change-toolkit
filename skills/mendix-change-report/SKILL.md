@@ -109,7 +109,8 @@ bash "$MXDIFF/sweep.sh" <oldSha> <newSha> detail
 ```
 
 Tool division: YAML gives properties, security and commit flags; MDL gives readable logic; BSON
-gives flow edges and settles disputes. Renames appear as `{A => B}` — never report those as an
+gives flow edges and settles disputes. The Studio Pro MCP is **not** a fourth option here — it
+only ever reads the project currently open in Studio Pro, so it cannot see either end of a range. Renames appear as `{A => B}` — never report those as an
 unrelated delete plus add. A document at `0 change(s)` was re-saved but is semantically identical.
 
 **Filter the lint output.** It lints whole changed *documents*, and a `DomainModels$DomainModel`

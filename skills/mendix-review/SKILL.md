@@ -213,6 +213,43 @@ Raw `.mxunit` BSON. Authoritative, and the **only** source for sequence-flow edg
 `RefreshInClient` on delete actions. A document listed with `0 change(s)` was re-saved but is
 semantically identical — say so rather than reporting it.
 
+**The Studio Pro MCP cannot help with a review.** It reads whatever project Studio Pro has open
+right now — the working copy — so it cannot see either side of a commit range. Do not reach for
+it here; `sweep.sh` and the YAML mirror are the only ground truth for historical state. (It is
+useful for `mendix-plan` and `explain-mendix-doc-complete`, which work on the current model.)
+
+## Grounding a convention claim — `search_mendix_knowledge_base`
+
+The most common way a review like this goes wrong is inventing a convention: calling something
+a violation when it is merely not how the reviewer would have written it. The Studio Pro MCP
+exposes Mendix's own documentation, so a convention claim can be checked instead of asserted.
+
+```
+search_mendix_knowledge_base { query: "microflow naming conventions best practice" }
+```
+
+Measured: that query returns the official `naming-convention-best-practices` refguide page plus
+the microflow event-type naming table. Use it before writing any finding that rests on "the
+convention is…", "Mendix recommends…" or "best practice is…". If the search supports you, cite
+the page; if it does not, soften the finding to an observation or drop it.
+
+Four things about it, all measured, all load-bearing:
+
+- **It returns community forum posts alongside official documentation**, in the same result and
+  with the same shape — entries beginning `Question:` are someone's forum post, not Mendix's
+  position. Never cite one as documentation. Prefer a `docs.mendix.com` URL.
+- **A null result proves nothing.** A specific behavioural question ("retrieve with limit 1 and
+  no sort — is the row non-deterministic") returned **zero** documents. The knowledge base covers
+  what is documented, not everything true. Never treat silence as confirmation either way, and
+  never make it a gate on reporting a finding you have real evidence for.
+- **It is expensive** — 14–24 KB per query. Two or three for a whole review, on the claims that
+  actually need it. Not one per finding.
+- **It needs Studio Pro open**, since the Studio Pro MCP serves it. If it is unavailable, carry
+  on without it and write findings the way you would have anyway; do not mention the tool.
+
+This is the one part of the MCP a range review can use — it reads Mendix's documentation, not the
+model, so the working-copy limitation above does not apply.
+
 ## What to look for
 
 Evidence over impression: quote the diff hunk.

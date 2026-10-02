@@ -22,6 +22,18 @@ Mendix project on that machine. Nothing is project-specific.
 | **mxcli** | readable MDL logic, callers/impact | `mxcli --version` |
 | **mxlint** (**3.17+**) | YAML model export, `lint --diff` | `mxlint version` |
 
+Last verified against **mxcli v0.24.0** and **mxlint v3.18.0** on Mendix 11.12.4 (2026-10-02).
+
+**[MODEL-READING.md](MODEL-READING.md) is the capability matrix** — mxcli vs mxlint vs the
+Studio Pro MCP vs raw BSON, measured on the same documents, with the sizes. Read it before
+deciding which tool answers a question; these tools' blind spots have moved between releases and
+two moved between mxcli v0.16 and v0.24.
+
+The short version: **mxcli reads everything** and is the default. The **Studio Pro MCP** supplies
+one short list of flags mxcli cannot render at all (`commit`, `refreshInClient`,
+`errorHandlingType`, `allowedModuleRoles`, `applyEntityAccess`) and is useless for anything else.
+**mxlint** is what `build-history.sh` replays to make commits diffable.
+
 **mxlint must be 3.17 or newer.** The git-backed modelsource workflow (`init`, `commit`,
 `lint --diff`) does not exist in older builds. `build-history.sh` and `review.sh` still work
 without it; `lint-diff.sh` does not.
@@ -162,11 +174,19 @@ Delete it any time; it rebuilds.
 
 Found by testing, not assumed:
 
-- **`mxcli diff-local` is broken** (v0.16.0) — `Error: mprcontents directory not found` on
-  every ref, both shells, relative and absolute paths. It is the built-in answer to this
-  problem and it does not work. That is why this toolkit exists.
+- **`mxcli diff-local` was broken at v0.16.0** — `Error: mprcontents directory not found` on
+  every ref, both shells, relative and absolute paths. That is why this toolkit exists.
+  **Re-tested on v0.24.0: it now connects and reports cleanly.** Only checked against a clean
+  tree, so whether its diff is correct on a dirty one is untested — the scripts below remain the
+  trusted path, but this is worth re-evaluating.
 - **`mxcli describe module X` does not dump module contents** despite its help text; it emits
-  only `create module X;`. MDL is per-document.
+  only `create module X;` plus the module roles. MDL is per-document. (Still true on v0.24.0.)
+- **mxcli cannot show `commit`, `refreshInClient`, `errorHandlingType`, `applyEntityAccess` or
+  `allowedModuleRoles`** in any output format — `-f json` only wraps the same MDL string. These
+  decide whether a change persists and who may run it, so they have to come from mxlint's YAML
+  or the Studio Pro MCP. See [MODEL-READING.md](MODEL-READING.md).
+- **Multi-clause XPath truncation is FIXED** as of v0.24.0. Older notes warning that mxcli drops
+  every clause after the first no longer apply; both clauses render.
 - **mxlint drops `Flows:` entirely** — sequence-flow edges are ID-based and IDs are stripped.
   Control flow survives only as the `pseudocode` scalar, whose `L001` labels **renumber**,
   producing fake `GOTO L021 -> L018` churn. Use `mdl-diff.sh` for flow logic. The expanded
@@ -174,13 +194,25 @@ Found by testing, not assumed:
 - **mxlint needs native paths** in its config (`C:/...` on Windows); MSYS `/c/...` fails with
   "error finding MPR file". Handled by `to_native()` in `lib.sh`.
 - **Marketplace/appstore modules are skipped** by mxlint export, so they never appear in
-  YAML diffs. `sweep.sh` still sees them.
+  YAML diffs. `sweep.sh` still sees them. (Observed on one project: `NanoflowCommons`, `OIDC`.)
+- **mxlint truncates long filenames** on export —
+  `SUB_Invoice_SendSingl_TRUNCATED_46aa2_icroflow.yaml`. A document with a long name cannot be
+  found by filename; grep the contents or use the generated `app.yaml` path map. Pages are
+  written as `Forms$Page.yaml`, not `Pages$Page.yaml`.
+- **mxlint's page export is enormous** — 7.4 MB of YAML for one page
+  (`Scheduling.Planning_Overview`), against 90 KB from `mxcli describe page`. Fine for diffing,
+  unusable for reading.
+- **The Studio Pro MCP is not a page reader.** `pg_read_page` returns 211 bytes with every widget
+  list elided to `"..."`, and its `depth` argument only truncates further. It expands one level
+  per call for every document type. Use it for flags, never for structure.
+- A full `mxlint export` of this project takes **18.5 s** (1,411 files, 24 content roots).
 - `sweep.sh` needs MPR v2 (`mprcontents/`, Mendix 10.18+).
 
 ## 6. Layout
 
 ```
 install.sh / install.ps1     installers
+MODEL-READING.md             which reader gives which fact, measured; the MCP; safety rules
 tools/
   lib.sh                     shared helpers, path + repo resolution
   doctor.sh                  dependency and project check
@@ -199,4 +231,7 @@ skills/
   mendix-test-instructions/
   mendix-change-notes/
   mendix-change-report/
+  mendix-scout/
+  mendix-plan/
+  explain-mendix-doc-complete/   one document, read at the highest fidelity available
 ```
