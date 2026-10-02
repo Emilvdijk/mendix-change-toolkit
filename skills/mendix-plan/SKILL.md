@@ -104,6 +104,39 @@ Work outwards from the most specific match, and establish for each candidate:
   features come from changing one member of a family** — and the story usually names only the
   half its author noticed. Say explicitly which siblings should change together.
 
+### Blast radius, measured rather than guessed — `graph-report`
+
+`callers` answers "who calls this one document". It does not tell you that the document is load
+bearing for the whole app, and that is the difference between a one-day story and a regression
+across half the project.
+
+```bash
+mxcli graph-report -p <app>.mpr --top 15          # markdown; --format json for parsing
+```
+
+Six sections, all derived from the reference graph. Three change plans:
+
+- **God nodes** — in-degree per asset. On one real project `ServerFeedback.SUB_Feedback_AddMessage`
+  came back with **in-degree 393**, and four entities were over 150. A story that edits one of
+  these is not a local change, however small the diff looks, and the plan must say so in
+  **Risks** rather than letting the reader discover it.
+- **Dead documents** — referenceable with no inbound edge. Check the story's target against this
+  before planning to extend it: extending something nothing calls is a different story, and
+  sometimes the right plan is to delete it.
+- **Module coupling / cohesion** — whether the change crosses a module boundary, and whether the
+  module it lands in is already entangled. A new cross-module edge belongs in **Risks**.
+
+Two things to know before you trust it:
+
+- **It runs a FULL catalog refresh** — the whole project, not the document you asked about. It is
+  the most expensive read in this skill. Run it once, early, and reuse the output; never per
+  candidate document.
+- **The dead-documents list is dominated by marketplace modules.** Measured, the top entries were
+  all `BZToaster`, `CommunityCommons` and `ExactOnline` entities — unreferenced because the app
+  uses part of a library, which is normal and not a finding. Framework modules are excluded by
+  default; add `--exclude` for the marketplace modules in this app, or read only the rows in
+  modules the team actually writes.
+
 ### Ground truth mxcli cannot give you — get it, do not defer it
 
 mxcli does not show **`AllowConcurrentExecution`**, **`ApplyEntityAccess`**, **`LocalizeDate`**,
