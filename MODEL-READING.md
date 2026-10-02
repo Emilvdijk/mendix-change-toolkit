@@ -322,17 +322,28 @@ All read-only:
 
 Studio Pro: **Preferences → AI → MCP Server**. Port defaults to 7782 (auto-selected from 11.13).
 
+Register it at **user scope**, not project scope. An agent launched against a Mendix checkout
+has that checkout as its working directory, so a server scoped to some other project is invisible
+to it — `claude mcp list` run from the checkout simply does not list it.
+
 ```bash
-claude mcp add mendix --transport http http://localhost:7782/mcp
+claude mcp add -s user mendix --transport http http://localhost:7782/mcp
 ```
 
-Two things that will otherwise waste your time:
+Three things that will otherwise waste your time:
 
+- **The URL hostname must be `localhost`, never `127.0.0.1`.** Studio Pro registers its prefix
+  with Windows http.sys under the literal hostname `localhost`, and http.sys matches on the Host
+  header, so the IP form is rejected before anything MCP-aware sees it. Measured on the same
+  endpoint, same instant: `Host: localhost` → **HTTP 200**, `Host: 127.0.0.1` → **HTTP 400 Bad
+  Request — Invalid Hostname**. The failure names the hostname, which is easy to read as a
+  networking problem rather than a string-matching one.
+- **mxcli's `--mcp-dial 127.0.0.1:7782` is the exception, and not a contradiction.** It overrides
+  only the TCP address dialled and leaves the URL — and therefore the Host header — as
+  `localhost`. Use it when mxcli's Go resolver sends `localhost` to the LAN address and hangs
+  (`dial tcp <your-LAN-ip>:7782: i/o timeout`). Never put the IP in the URL itself.
 - **Tools do not appear in a session that was already running** when you added the server.
   `claude mcp list` says `✔ Connected` and the tools still are not there. Start a new session.
-- **`localhost` can resolve to the LAN address and time out** — mxcli hit
-  `dial tcp <your-LAN-ip>:7782: i/o timeout`. Use `--mcp-dial 127.0.0.1:7782`, or `127.0.0.1`
-  in the URL.
 
 The listener is registered with Windows http.sys on **`0.0.0.0:7782`**, not loopback, and exposes
 write tools into an open project with **no authentication**. On an untrusted network, turn it off
