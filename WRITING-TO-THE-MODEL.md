@@ -453,16 +453,77 @@ correctly warned that a module update would overwrite the snippet call — but s
 edit as something the MCP could do. One `list_modules` call during planning would have routed it
 to a person from the start.
 
+## 16. The agent's own tooling corrupted a write, and nothing caught it
+
+Three errors in the snippet turned out to be visibility expressions missing their context prefix:
+
+```
+Visible: 'not(/IsMinimized)'                  <- what reached the model
+Visible: 'not($currentObject/IsMinimized)'    <- what was intended
+```
+
+**mxcli wrote faithfully what it was given.** The `$currentObject` was eaten by shell escaping
+while *generating* the MDL file — a `$` inside a JS template literal inside a bash heredoc. The
+file on disk was already wrong before mxcli ever saw it.
+
+Nothing caught it:
+
+- `mxcli check` passed. It validates syntax and references; a visibility expression that is
+  syntactically valid and references a real attribute passes even when the context root is missing.
+- The read-back step was skipped — again (§14).
+- `ped_check_errors` cannot read snippets at all, so the MCP would not have caught it either.
+
+It surfaced only when a person opened Studio Pro and read the error list.
+
+**The lesson is about the generation step, not the writing step.** Every safeguard in this document
+is aimed at what the tool does with the input. None of them look at whether the input says what the
+author meant. Two cheap defences:
+
+1. **Write MDL with a quoted heredoc** (`<<'EOF'`), never an interpolating one, and never through
+   a script that re-escapes the content. `$` is load-bearing in MDL and in every shell.
+2. **Print the generated file and read the critical lines before running it.** One `grep -n
+   "Visible"` would have shown `not(/IsMinimized)` and cost nothing.
+
+The fix was re-running the same statement with correct escaping, then reading it back — all three
+expressions now carry `$currentObject`, verified rather than assumed.
+
+### `mxcli exec` is not atomic across statements
+
+The fix script carried two statements. The first applied, the second failed:
+
+```
+Replaced snippet SampleApp.Snippet_WeatherWidget
+Error: microflow not found: SampleApp.ACT_WeatherHelper_ToggleMinimized
+```
+
+(The grant used `ON MICROFLOW` for a nanoflow; the correct form is
+`GRANT EXECUTE ON NANOFLOW Module.Name TO Module.Role`, which does exist.)
+
+So a failed `exec` can leave a script half-applied — unlike `ped_update_document`, where a failed
+operation applies nothing. **Order statements so the risky one runs first**, or run them
+separately, and never assume a failed `exec` changed nothing.
+
+### A documentation failure worth recording
+
+The hand-off checklist told the user to run:
+
+```bash
+mxcli describe layout Siemens_UI_Module.iX_Application_Frame -p "<app>.mpr"
+```
+
+They ran it literally and got `failed to set busy_timeout: unable to open database file (14)` —
+because `<app>.mpr` is not a file. **A checklist a person executes must contain literal, runnable
+commands**, with the real filename in them. A placeholder is fine in reference documentation and
+wrong in an instruction.
+
 ## Status of this run
 
-Steps 2-9 built: eight model documents plus the CSS, all verified on disk. Model integrity held
-across four exec runs (Unit table and .mxunit count matched exactly at every point).
-
-Six errors surfaced when Studio Pro reopened (section 14). Fixed: the microflow allowed roles (MCP)
-and the mapping schema mismatch (a human right-click). Outstanding: allowed roles on the nanoflow,
-which the MCP refuses outright and which needs mxcli with Studio Pro closed or two clicks by hand.
+Steps 2-9 built and all known errors cleared: eight model documents plus the CSS, verified by
+reading each back. Integrity held throughout -- Unit table 1386 rows, 1386 .mxunit files.
 
 Step 10, the layout edit, is human-only (section 15). Step 11, running the app, no tool here does.
 
-The feature is therefore assembled but not wired in, which is the accurate summary of what this
-pipeline currently delivers.
+Six errors surfaced when Studio Pro reopened. Two were skipped verification steps the plan had
+specified (section 14), three were a corrupted write the generating script caused (section 16),
+and one was a schema mismatch no mxcli check validates. All are now fixed. None were found by the
+tooling that produced them.
