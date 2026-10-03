@@ -197,13 +197,79 @@ nobody made.
    (§9), and the only one that confirms what reached disk. `git status` should show the `.mpr`
    plus one `.mxunit` per document touched — more than that means something else moved.
 
+## 11. The mxcli leg, measured against the same story
+
+Steps 3–5 (JSON structure, import mapping) went through mxcli with Studio Pro closed. Three
+documents created in one `exec`. Everything read back exactly as written.
+
+**Correction to an earlier note in this file's history:** mxcli *can* author both
+`CREATE JSON STRUCTURE … SNIPPET '{…}'` and `CREATE [OR MODIFY] IMPORT MAPPING … WITH JSON
+STRUCTURE`. The `MDL-REST01` restriction — "an existing import/export mapping document cannot be
+referenced here" — applies only to inline mappings on a **REST client operation**, a different
+construct. A `REST CALL` activity in a microflow takes `RETURNS MAPPING Module.IMM AS Module.E`
+and references the document normally.
+
+### What mxcli does better than the MCP
+
+| | MCP | mxcli |
+|---|---|---|
+| Dry run before applying | none | **`mxcli check`** — syntax + reference validation, no write |
+| String length honoured | ✗ silently became `String(200)` | ✓ `String(40)` as written |
+| Unit of work | one call per operation shape | one script, many statements, applied together |
+| Reviewable before execution | no — JSON built in flight | **yes — MDL is text you can read and diff** |
+
+`mxcli check` is the single biggest safety difference. It reported `✓ Syntax OK (3 statements)`
+and `✓ All references valid` *before* anything touched the file. The MCP has no equivalent:
+`ped_check_errors` only runs on documents that already exist, so the first time you learn a write
+is malformed is when it has already been attempted.
+
+The `String(40)` vs `String(200)` difference is the same class of problem as §9 — but mxcli got it
+right because MDL can *express* the length, and the MCP constructor schema cannot.
+
+### Integrity: the published corruption signature did not reproduce
+
+The most-cited failure in the mxcli MVP report (April 2026, v0.7.0) is a fresh `.mpr` whose
+*"DB has 407 entries; only 38 files exist on disk"*, crashing Studio Pro with
+`DirectoryNotFoundException`. After this write on v0.24.0:
+
+```
+.mpr Unit table rows : 1381
+.mxunit files on disk: 1381
+```
+
+Exact match, 3 new units for 3 new documents (JSON structure, import mapping, and the
+`Objects/Weather` folder), nothing stray. The entity written earlier through the MCP survived
+untouched.
+
+**This is one small write, not a full MVP build**, so it does not retire the report's finding —
+but the signature is absent where it was previously reliable, and the v0.24 changelog is largely
+write-path hardening. Treat the 80/20 number as unmeasured on current versions rather than true.
+
+### A simplification the plan could not know about
+
+The plan proposed two mapping entities joined by an association — the shape Studio Pro's mapping
+generator produces. MDL import mappings support **nested members** (`Attr = a/b/c`), which reach a
+leaf with no entity for the levels in between, so one entity was enough:
+
+```
+create SampleApp.OpenMeteoCurrent {
+  Time          = current/time,
+  TemperatureC  = current/temperature_2m,
+  WeatherCode   = current/weather_code
+}
+```
+
+Recorded as a deliberate deviation in the script's own comment header. The general lesson: a plan
+written against Studio Pro's idioms will over-specify for mxcli, because the generator's output
+shape and the language's expressive shape are not the same. **A plan for a writing agent should
+name the outcome, not the document topology** wherever the two can differ.
+
 ## Status of this run
 
-Step 2 of 11 complete (`SampleApp.WeatherHelper`), verified on disk, validator clean.
+Steps 2, 3 and 4 complete and verified on disk: the helper entity (MCP), and the JSON structure,
+import mapping and mapping entity (mxcli). Both write paths exercised on one story.
 
-Steps 3–5 are the JSON structure, import mapping and Call REST. The MCP cannot author any of
-them — *"OData/REST, mappings — no PED write path"* — so the next leg is mxcli, which requires
-Studio Pro **closed**, and whose `CREATE REST CLIENT` stores mappings inline on the operation and
-rejects a reference to a separate mapping document (`MDL-REST01`). The plan specifies separate
-`JSON_*` and `IM_*` documents, which is Studio Pro's shape, not mxcli's. That reshaping is
-unresolved and is the next thing to measure.
+Step 5 is the Call REST microflow, step 7 the nanoflow, step 8 the snippet, step 10 the layout edit --
+which can ONLY go through the MCP, since mxcli would silently drop the sidebar toggles on all 33
+pages that use it. So the remaining work alternates between the two writers, and the model has to
+be saved and Studio Pro reopened between legs.
