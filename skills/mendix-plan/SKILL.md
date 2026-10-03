@@ -311,6 +311,46 @@ Numbered steps a developer can follow, each one independently checkable. Put any
 be verified early (a query, a validation) before anything expensive. Note where Studio Pro will
 force a particular order.
 
+**Every qualification gets its own numbered line and its own `Check:`.** Not prose inside a step.
+
+This is the rule with the most evidence behind it. Measured over one agent-executed plan, four
+instructions were dropped, and every single one was a qualification buried in a step's prose
+rather than a step of its own:
+
+| Dropped | Where it was written |
+|---|---|
+| grant execute to both module roles | a sentence inside step 6 |
+| allowed roles on the nanoflow | a clause inside step 7 |
+| `String(100)` on an attribute | a cell in the attributes table |
+| caption must reflect the minimized state | a sentence inside step 8 |
+
+The structure of the plan was followed exactly — every document created, in order, with the right
+names. What got skipped was the judgement *inside* the steps, which is the part only this skill
+supplies. An executing agent reliably reads the numbered list and reliably skims the paragraphs.
+
+So write:
+
+```
+6. Create `Module.DS_Thing`. Create the object without commit, call the fetch, return it.
+   Check: `mxcli describe microflow Module.DS_Thing` renders the three activities.
+7. Grant execute on `Module.DS_Thing` to `Module.Administrator` AND `Module.User`.
+   `DS_Other` grants only `Module.User` — do not copy that pattern, it hides the feature
+   from admins.
+   Check: Studio Pro error list is clean, or `ped_read_document` shows two allowedModuleRoles.
+```
+
+not:
+
+```
+6. Create `Module.DS_Thing` … and grant execute to Module.Administrator and Module.User.
+```
+
+**The `Check:` line matters as much as the instruction.** Pick a check the executing agent can
+actually run, and name the tool — mxcli cannot see allowed roles, commit flags or error state, so
+a `Check:` that says `mxcli describe` for any of those is unrunnable. See `MODEL-READING.md` for
+which reader sees which fact, and `WRITING-TO-THE-MODEL.md` §14 for what happens when a plan's
+checks are skipped.
+
 ## Risks and things to watch
 Named risks, not "be careful". Security rules, commit/event side effects, shared sub-microflows,
 scheduled events, anything that runs unattended, and families where changing one member without
