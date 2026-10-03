@@ -318,6 +318,80 @@ Carried forward so a reviewer does not have to diff the plan to find them:
 None of these were silent. The first two were found by reading back with mxcli; the rest were
 reported by `mxcli check` before anything was written.
 
+## 14. Studio Pro found six errors. Would this process have caught them?
+
+Mostly no. Reopening Studio Pro after the mxcli leg surfaced six errors in work that `mxcli check`
+had passed and that had been read back and verified. Taken honestly, they fall into three groups,
+and only one of them is a tool gap.
+
+### Group 1 — the plan told me, and I did not do it (2 errors)
+
+> `SampleApp.DS_WeatherHelper`: At least one allowed role must be selected if the microflow is
+> used from navigation, a page, a nanoflow or a published service.
+
+Same for the nanoflow. The plan said, in step 6, in as many words:
+
+> Grant execute to `SampleApp.Administrator` and `SampleApp.User`. (`DS_InfopanelHelper` grants
+> only `SampleApp.User`; do not copy that.) **Check: `mxcli describe microflow
+> SampleApp.DS_WeatherHelper` shows both grants.**
+
+The grant was never written, and the check was never run. `mxcli describe` shows the microflow
+with no grants, so **the plan's own verification command would have caught this immediately**.
+
+This is not a tooling failure. Every step of that plan carried a `Check:` line, and this run
+executed the writes and skipped the checks. **That is the single most important process finding
+here**, and it is a discipline problem, not a capability one: an agent that writes faster than it
+verifies produces exactly this.
+
+### Group 2 — a real gap between the two validators (1 error)
+
+> `SampleApp.IM_OpenMeteoCurrent`: The mapping does not align with the underlying schema anymore.
+> Attribute type 'String' does not match schema type 'DateTime' of element `(Object)/current/time`.
+
+`mxcli check` passed this. The JSON structure inferred `time` as **DateTime** from the ISO-looking
+string `"2026-10-03T17:45"`; the mapping entity declared `Time: String(40)`, following the plan's
+design of parsing it in the microflow. Nothing in the mxcli toolchain compares an entity attribute
+type against the inferred schema type of the element it is mapped from.
+
+`mxcli check` validates **syntax and references**. Studio Pro's error list validates **the model**.
+They are not the same check and they catch disjoint sets — §12 is a crash that Studio Pro would
+not have reported until the page was opened, and this is a type mismatch that check will never
+report at all.
+
+**Treating a green `mxcli check` as "correct" is the mistake.** It means "this will apply", not
+"this is right".
+
+### Group 3 — invisible to the tooling entirely (the remainder)
+
+`ped_check_errors` on the snippet returns:
+
+> `No API registered for unit type 'Pages$Snippet'.`
+
+So **snippets cannot be error-checked over MCP at all**. Any error in the widget tree is
+unreachable from either tool: mxcli has no model validator, and the MCP refuses the document type.
+Those errors are visible only to a person with Studio Pro open.
+
+### What this changes
+
+1. **Run the plan's `Check:` line after every step, before the next write.** Not at the end.
+2. **Reopen Studio Pro and run `ped_check_errors` after any mxcli leg**, before building on it.
+   It is the only validator that sees the model as Mendix sees it.
+3. **Expect to end at a human.** Of the three errors reachable by tooling, the MCP could fix one
+   (`allowedModuleRoles` on a microflow), could not fix the second
+   (`Microflows$Nanoflow is not supported` — updates are excluded, not just creates), and the
+   third is a right-click in Studio Pro ("Resolve by updating from schema").
+
+### Fix routing for these six
+
+| Error | Fixable by |
+|---|---|
+| `DS_WeatherHelper` allowed roles | **MCP** — done, `/allowedModuleRoles` add × 2 |
+| nanoflow allowed roles | **not the MCP.** mxcli `GRANT EXECUTE` with Studio Pro closed, or by hand |
+| mapping type mismatch | mxcli (retype the attribute) with Studio Pro closed, or Studio Pro's right-click |
+| snippet errors | unknown to tooling — needs a person to read them |
+
+Three tools, three different closure paths, for one feature's worth of errors.
+
 ## Status of this run
 
 Steps 2-9 complete and verified on disk. Model integrity held across four exec runs:
