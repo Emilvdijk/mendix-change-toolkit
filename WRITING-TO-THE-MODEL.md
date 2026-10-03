@@ -146,15 +146,64 @@ It could not know §1 or §2, because nothing documented them. Its per-step veri
 are all mxcli, and half of them are unreachable on the MCP path. **A plan intended for a writing
 agent must be told which reader can verify each step**, not just which writer can author it.
 
-## 9. Working order for an MCP write
+## 9. `SUCCESS` does not mean the result matches the plan
+
+The loop closed: after a person clicked "Update security" and saved, `ped_check_errors` returned
+*No errors found*, mxcli read the entity, and `git status` showed exactly **two** files — the
+`.mpr` and **one** `.mxunit`. A single-unit diff, cleanly attributable. That part worked.
+
+What the model actually contains is not quite what was asked for:
+
+```
+create or modify non-persistent entity SampleApp.WeatherHelper (
+  TemperatureC: Decimal default 0,        <-- a default nobody asked for
+  ConditionText: String(200),             <-- the plan said String(100)
+  ObservedAt: DateTime,
+  IsAvailable: Boolean default false,
+  IsMinimized: Boolean default false
+);
+```
+
+Every write returned `SUCCESS`. Nothing warned. Both deviations are the platform filling in its
+own defaults for properties the constructor schema does not expose — `String` length defaults to
+200, `Decimal` gets `default 0` — and both are invisible from inside the MCP, because
+`ped_read_document` does not echo them either.
+
+**The only thing that surfaced them was reading the result back with a different tool.** This is
+the strongest argument in these notes for keeping mxcli in the loop on the MCP path: not as the
+writer, but as the independent reader that can see what the writer actually produced.
+
+So the verification step is not "did it succeed" but **"does the result match the spec, field by
+field"** — and on an MCP write that comparison has to happen after the save, in mxcli.
+
+Neither deviation matters for this story: 200 characters is harmless for a weather condition
+string, and `Decimal default 0` is inert on a non-persistent helper that is always filled before
+use. That is luck, not design. On a persistent entity an unrequested default is a data decision
+nobody made.
+
+## 10. Working order for an MCP write
 
 1. `ped_get_schema` for every element type involved. Mandatory, and it is the real contract.
 2. `ped_check_errors` on the target documents — the baseline (§3).
 3. Confirm the document does not already exist. Not with `ped_find_document` if it is a domain
    model (§6.4).
 4. Write. Batch independent `add`s; isolate anything destructive (§7).
-5. Re-read what you wrote with `ped_read_document` and check it field by field. Do not assume
-   `SUCCESS` means the result matches the intent — it means the operations applied.
+5. Re-read what you wrote with `ped_read_document`. Do not assume `SUCCESS` means the result
+   matches the intent — it means the operations applied (§9).
 6. `ped_check_errors` again. Compare against the baseline from step 2.
 7. **Hand back to a person** for "Update security" if access rules changed, and for the save.
-8. Only after the save: verify with mxcli, and `git status` to see the change on disk.
+8. After the save, read the result back **with mxcli** and diff it against the plan field by
+   field. This is the only step that catches platform-supplied defaults the MCP never shows you
+   (§9), and the only one that confirms what reached disk. `git status` should show the `.mpr`
+   plus one `.mxunit` per document touched — more than that means something else moved.
+
+## Status of this run
+
+Step 2 of 11 complete (`SampleApp.WeatherHelper`), verified on disk, validator clean.
+
+Steps 3–5 are the JSON structure, import mapping and Call REST. The MCP cannot author any of
+them — *"OData/REST, mappings — no PED write path"* — so the next leg is mxcli, which requires
+Studio Pro **closed**, and whose `CREATE REST CLIENT` stores mappings inline on the operation and
+rejects a reference to a separate mapping document (`MDL-REST01`). The plan specifies separate
+`JSON_*` and `IM_*` documents, which is Studio Pro's shape, not mxcli's. That reshaping is
+unresolved and is the next thing to measure.
