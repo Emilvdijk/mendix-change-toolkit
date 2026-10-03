@@ -38,6 +38,41 @@ model is worse than no plan. When Dash invokes this skill it performs the same c
 refuses the run, so reaching this skill at all normally means the checkout was current when the
 run started.
 
+### Check writability before proposing any change to an existing document
+
+If the Studio Pro MCP is available, call `list_modules` once, up front, and keep the result. Every
+module comes back with two flags that decide whether a change is even possible:
+
+```json
+{"moduleName":"Siemens_UI_Module","writable":false,"fromMarketplace":true}
+{"moduleName":"SampleApp","writable":true,"fromMarketplace":false}
+```
+
+**A change to a `writable: false` module cannot be authored by any tool.** Not by the MCP, which
+refuses the module; and usually not by mxcli either, because Marketplace modules are full of
+widgets it cannot re-author — writing one back silently drops them.
+
+This matters most for **layouts**, which is where a "make it appear everywhere" story naturally
+lands, and layouts in this ecosystem usually belong to a Marketplace UI module. Measured on a real
+run: a plan correctly identified the one layout 33 pages used, correctly warned that a Marketplace
+module update would overwrite the change — and still listed the edit as something an agent could
+make. It could not. The MCP has no layout document type at all (`Forms$Layout` and `Pages$Layout`
+are both "Unknown document type"), and mxcli would have deleted two sidebar toggle widgets from
+every page in the app.
+
+So, in **Documents to change**, mark each row with who can author it:
+
+| Document | Module writable? | Authorable by |
+|---|---|---|
+| `SampleApp.Snippet_Foo` | yes | mxcli or MCP |
+| `SomeMarketplace.SomeLayout` | **no** | **a person in Studio Pro** |
+
+A plan that ends with "and then a person adds one widget call in Studio Pro" is a *better* plan
+than one that discovers it at the last step. Say it in **Approach**, not only in the table.
+
+Without the MCP, infer it: a module you did not write and that appears in the Marketplace section
+of the project is almost certainly read-only. Say the check could not be made.
+
 ## Step 1 — start from the scout report
 
 If a scout report for this story exists you will be told its path. **Read it first.** It carries
