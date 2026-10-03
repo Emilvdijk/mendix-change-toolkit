@@ -6,8 +6,16 @@ app, Mendix 11.12.4, Studio Pro MCP server on `localhost:7782`, mxcli v0.24.0, 2
 Everything here was measured during the run. Where a published capability list disagrees with
 what the server did, the server wins and the disagreement is recorded.
 
-**Status: incomplete.** One entity was written. The run stopped at a human-required step, which is
-itself the most important finding.
+**Status: the feature was built and runs.** Nine model documents plus CSS, authored by an agent
+across both write paths, with a person doing the five steps no tool can (§15). The app starts
+without error and the widget works.
+
+> **These findings are properties of Mendix 11.12.4**, with mxcli v0.24.0 and mxlint v3.18.0 —
+> not of the tools in general. Every gap recorded here is a gap *on this version*. Studio Pro
+> 11.15 already carries MCP changes (scoped `ped_check_errors` among them, per mxcli#922) that may
+> close some of them, and both CLIs move fast: two claims in this toolkit's own notes went stale
+> between mxcli v0.16 and v0.24. Re-probe before trusting any capability statement on a different
+> version, and treat this file as a dated measurement rather than a specification.
 
 ---
 
@@ -569,14 +577,37 @@ A plan for a writing agent should therefore put every qualification on its own n
 its own `Check:`, rather than in prose inside a step. Prose inside a step is where instructions go
 to be skimmed.
 
-## Status of this run
+## Status of this run — complete
 
-Steps 2-9 built and all known errors cleared: eight model documents plus the CSS, verified by
-reading each back. Integrity held throughout -- Unit table 1386 rows, 1386 .mxunit files.
+**The app runs without error and the widget works.** Nine model documents plus the stylesheet:
 
-Step 10, the layout edit, is human-only (section 15). Step 11, running the app, no tool here does.
+```
+SampleApp.WeatherHelper                      entity        MCP
+SampleApp.JSON_OpenMeteoCurrent              json struct   mxcli
+SampleApp.IM_OpenMeteoCurrent                import map    mxcli
+SampleApp.OpenMeteoCurrent                   entity        mxcli
+SampleApp.WeatherHelper_FetchCurrent         microflow     mxcli
+SampleApp.DS_WeatherHelper                   microflow     mxcli
+SampleApp.ACT_WeatherHelper_ToggleMinimized  nanoflow      mxcli
+SampleApp.Snippet_WeatherWidget              snippet       mxcli
+theme/web/custom-sample_app.scss             stylesheet    file write
+Siemens_UI_Module.iX_Application_Frame       layout        A PERSON
+```
 
-Six errors surfaced when Studio Pro reopened. Two were skipped verification steps the plan had
-specified (section 14), three were a corrupted write the generating script caused (section 16),
-and one was a schema mismatch no mxcli check validates. All are now fixed. None were found by the
-tooling that produced them.
+Model integrity held throughout: the `.mpr` Unit table and the `.mxunit` file count matched
+exactly at every checkpoint, across five `exec` runs and four MCP writes.
+
+**Nine errors surfaced in total, in two waves, and none were found by the tooling that produced
+them:**
+
+| Wave | Count | Cause | Found by |
+|---|---|---|---|
+| Studio Pro reopened | 7 | 3 skipped plan checks, 3 corrupted by the generating script, 1 schema mismatch | a person opening the IDE |
+| App running | 2 | an invented CSS variable, a static button caption | a person looking at the screen |
+
+Of the nine, **four were plan instructions that were written down and not carried out**, and every
+one of those was a qualification inside a step rather than a step of its own (§17). That finding
+is now a rule in `mendix-plan`.
+
+The honest summary: the write paths are reliable and the verification discipline around them is
+not. Every tool did what it was told. Nothing caught what it was told wrong.

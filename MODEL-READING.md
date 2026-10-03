@@ -6,6 +6,12 @@ that basis. The one thing it does not buy you is history — see §5.
 Four readers exist and **not one of them is complete**. This file records what each actually
 returns, measured, and which to reach for. Nothing here is taken from a help text.
 
+> **These are properties of Mendix 11.12.4**, with mxcli v0.24.0 and mxlint v3.18.0 — not of the
+> tools in general. Every gap below is a gap *on this version*, and both CLIs move fast: two
+> claims in this file went stale between mxcli v0.16 and v0.24, and Studio Pro 11.15 already
+> carries MCP changes that may close others. Treat this as a dated measurement, not a
+> specification, and re-probe before trusting it on a different version.
+
 Measured 2026-10-02 against a production ERP project (`<app>.mpr`, Mendix **11.12.4**, 41 modules,
 998 microflows, 231 pages, 15,044 activities) with **mxcli v0.24.0**, **mxlint v3.18.0** and the
 **Studio Pro 11.12 MCP server** on `localhost:7782`. Re-measure when any of those move; these
