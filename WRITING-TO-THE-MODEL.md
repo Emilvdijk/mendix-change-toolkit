@@ -392,14 +392,77 @@ Those errors are visible only to a person with Studio Pro open.
 
 Three tools, three different closure paths, for one feature's worth of errors.
 
+## 15. The last step cannot be done by any tool
+
+Step 10 — adding one snippet call to `Siemens_UI_Module.iX_Application_Frame`, the layout all 33
+pages use — is the step that makes the feature appear. It is blocked by **two independent
+constraints**, either of which alone is enough:
+
+**The MCP has no layout type.** `ped_read_document` rejects both plausible names:
+
+```
+Forms$Layout  -> ERROR: Unknown document type 'Forms$Layout'.
+Pages$Layout  -> ERROR: Unknown document type 'Pages$Layout'. Did you mean: Pages$Page?
+```
+
+The suggestion is `Pages$Page`, so there is no layout type in the registry at all. `ped_list_folder`
+on the module's `_Layouts` folder returns no documents either.
+
+**The module is not writable.** `list_modules` reports it plainly:
+
+```json
+{"moduleName":"Siemens_UI_Module","writable":false,"fromMarketplace":true}
+```
+
+**And mxcli is already ruled out** — the plan found two `Forms$SidebarToggleButton` widgets marked
+*"NOT re-executable: mxcli cannot author this widget"*, so writing the layout back would silently
+delete them from every page.
+
+So the routing table for this one step is:
+
+| Writer | Verdict |
+|---|---|
+| Studio Pro MCP | no layout type, and the module is read-only |
+| mxcli | would destroy the sidebar toggles on 33 pages |
+| **A person in Studio Pro** | **the only path** |
+
+### What that means for the pipeline
+
+An agent built eight of the nine model documents for this feature. The ninth — a single widget
+call, the smallest change in the plan — is human-only, and it is the one that makes the other
+eight visible to a user.
+
+This is worth stating plainly because it is not an argument against the pipeline. Eight documents
+authored, validated and verified is real work. But **"scout → plan → build" does not end in a
+built feature.** It ends in a feature that is assembled except for its integration point, with a
+person needed for:
+
+1. "Update security" after an access-rule change (§1)
+2. Saving the model (§1)
+3. Reopening Studio Pro between an mxcli leg and an MCP leg (§11)
+4. Reading snippet errors, which no tool can (§14)
+5. **The layout edit itself**
+
+The honest framing is that the agent does the typing and the person does the wiring.
+
+### A note on marketplace modules
+
+`writable: false` is the single most useful field `list_modules` returns, and a planner should ask
+for it **before** proposing a change. The plan here knew the layout was a Marketplace module and
+correctly warned that a module update would overwrite the snippet call — but still proposed the
+edit as something the MCP could do. One `list_modules` call during planning would have routed it
+to a person from the start.
+
 ## Status of this run
 
-Steps 2-9 complete and verified on disk. Model integrity held across four exec runs:
-Unit table 1386 rows, 1386 .mxunit files on disk, exact.
+Steps 2-9 built: eight model documents plus the CSS, all verified on disk. Model integrity held
+across four exec runs (Unit table and .mxunit count matched exactly at every point).
 
-Step 10 -- one snippet call into Siemens_UI_Module.iX_Application_Frame -- is the last model
-change, and it can ONLY go through the MCP: mxcli would silently drop two sidebar toggle widgets
-it cannot author, on the layout all 33 pages use. So Studio Pro has to be reopened for it, which
-is the third human step in this pipeline after Update security and save.
+Six errors surfaced when Studio Pro reopened (section 14). Fixed: the microflow allowed roles (MCP)
+and the mapping schema mismatch (a human right-click). Outstanding: allowed roles on the nanoflow,
+which the MCP refuses outright and which needs mxcli with Studio Pro closed or two clicks by hand.
 
-Step 11 is running the app, which no tool here does.
+Step 10, the layout edit, is human-only (section 15). Step 11, running the app, no tool here does.
+
+The feature is therefore assembled but not wired in, which is the accurate summary of what this
+pipeline currently delivers.
