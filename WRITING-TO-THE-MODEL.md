@@ -516,6 +516,59 @@ because `<app>.mpr` is not a file. **A checklist a person executes must contain 
 commands**, with the real filename in them. A placeholder is fine in reference documentation and
 wrong in an instruction.
 
+## 17. The widget rendered. Both remaining bugs were outside every validator.
+
+With the layout edit done by hand, the widget appeared — and was white text on a white box, with a
+button that said "Minimize" in both states. Model-valid, error-free, and wrong.
+
+### An invented CSS variable, which nothing checks
+
+```scss
+background: var(--background-color-secondary, #fff);   // defined NOWHERE
+```
+
+Grepping the theme for that name returns exactly one hit: the line above. It was invented. The
+fallback `#fff` therefore always won, the text inherited white, and the result was invisible.
+
+The theme does define the right variables, and they flip with the light/dark toggle the app
+already has:
+
+```
+--panel-bg            white (light)     / cool-gray-720 (dark)
+--font-color-default  deep-blue (light) / white (dark)
+```
+
+**No validator in this pipeline looks at CSS.** `mxcli check` validates MDL. `ped_check_errors`
+validates model documents. Neither reads `theme/web/*.scss`, so a stylesheet that references
+variables which do not exist is not a warning anywhere — it is simply a widget nobody can see.
+The only test is running the app.
+
+So for any step that writes CSS: **grep the theme for every custom property you reference before
+writing it**, and set `color` explicitly rather than inheriting. The cost is one `grep`; the
+alternative is a bug that survives every automated gate in this document.
+
+### The plan specified the button behaviour, and it was not built
+
+> The caption or icon reflects the state: **two buttons with opposite visibility on
+> `IsMinimized`**, or one button with an expression caption.
+
+What was built was a single button with the static caption `'Minimize'`. The plan had not only
+specified the behaviour but pre-selected the authorable shape — the two-button form exists in that
+sentence precisely because the expression-caption form hits `MDL-WIDGET14`.
+
+This is the **fourth** time in this run that a plan instruction was not carried out (§14 twice,
+§16, here). Every one was a detail inside a step rather than a step of its own, and every one was
+written down before the work started.
+
+**That is the pattern worth naming.** A writing agent reliably executes the *structure* of a plan —
+the numbered steps, the document names — and reliably drops the *qualifications* inside them: the
+grant on step 6, the state-dependent caption on step 8, the exact string length. Those are where
+the plan's judgement lives.
+
+A plan for a writing agent should therefore put every qualification on its own numbered line with
+its own `Check:`, rather than in prose inside a step. Prose inside a step is where instructions go
+to be skimmed.
+
 ## Status of this run
 
 Steps 2-9 built and all known errors cleared: eight model documents plus the CSS, verified by
