@@ -577,6 +577,44 @@ A plan for a writing agent should therefore put every qualification on its own n
 its own `Check:`, rather than in prose inside a step. Prose inside a step is where instructions go
 to be skimmed.
 
+## 18. `mxcli --mcp` does not remove the open/close dance
+
+`mxcli --mcp` routes MDL writes through a running Studio Pro instead of the `.mpr`. If it worked
+across the board it would be the best of both: MDL's expressiveness, `mxcli check`'s dry run, and
+`ped_check_errors` in one session with Studio Pro open — removing the single biggest friction in
+this pipeline.
+
+Tested with Studio Pro open, one construct per probe, using exactly what DAS-2 needed:
+
+| Construct | via `--mcp` | DAS-2 needed it |
+|---|---|---|
+| Microflow `CREATE` | ✅ | yes |
+| Non-persistent entity | ❌ *"non-persistent entities are not yet supported by the MCP backend (entity slice); create it against a local .mpr instead"* | yes |
+| JSON structure | ❌ *"CreateJsonStructure: not supported by the MCP backend; run without --mcp"* | yes |
+| Import mapping | ❌ *"CreateImportMapping: not supported by the MCP backend"* | yes |
+| Snippet | ❌ *"CreateSnippet: not supported by the MCP backend"* | yes |
+| Nanoflow | ❌ *"PED's create whitelist excludes Microflows$Nanoflow"* | yes |
+| `GRANT EXECUTE` / allowed roles | ❌ *"UpdateAllowedRoles: not supported by the MCP backend"* | yes |
+| `DROP` | ❌ *"delete_document requires the Concord MCP server — pass --mcp-concord"* | — |
+
+**Of the eight things this one feature needed, `--mcp` could author exactly one.** Everything else
+answers "run without `--mcp`".
+
+So the architecture stands as measured in §11 and §15: **mxcli with Studio Pro closed for most
+authoring, the MCP with it open for the flags, the validator and the layout.** The open/close
+cycle is not an accident of how this run was done; it is forced by the tooling.
+
+Two things worth keeping from the probes:
+
+- **The error messages are exemplary** — every one names the limitation *and* the workaround, in
+  the same sentence. That is the same standard as `MDL-WIDGET14` (§12) and it is why mxcli's own
+  diagnostics beat any capability summary, including `mxcli mcp capabilities`.
+- **Concord is real, not vapourware.** `DROP` fails with a specific instruction to pass
+  `--mcp-concord`, so a second server exists that supplies delete, save, validate and run. It is
+  not part of this setup and appears nowhere in public documentation, so it stays an unknown — but
+  if it were connected it would close the "no save tool" gap from §1, which is one of the five
+  human steps.
+
 ## Status of this run — complete
 
 **The app runs without error and the widget works.** Nine model documents plus the stylesheet:
