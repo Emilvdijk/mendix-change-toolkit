@@ -264,12 +264,68 @@ written against Studio Pro's idioms will over-specify for mxcli, because the gen
 shape and the language's expressive shape are not the same. **A plan for a writing agent should
 name the outcome, not the document topology** wherever the two can differ.
 
+## 12. `mxcli check` prevented a Studio Pro crash
+
+Steps 6–8 (datasource microflow, nanoflow, snippet) took **three check iterations and zero
+writes**. The first attempt would have produced a model that crashes the IDE:
+
+> `widget weatherTemp (dynamictext) references template placeholder {1} but only 0 parameter(s)
+> are bound … **An orphaned placeholder crashes Studio Pro.**` `[MDL-WIDGET04]`
+
+The property was `Parameters:` where MDL wants `ContentParams: [{1} = …]`, and a second rule
+caught that the wrong spelling would have been *"silently dropped on write"* rather than
+rejected — so the write would have "succeeded".
+
+This is the clearest result in these notes. **The MCP has no equivalent of this step**, and the
+same mistake made through `pg_patch_page` would have been applied, saved, and discovered when
+somebody opened the page.
+
+Two more rules fired, both the kind of knowledge a reviewer usually supplies:
+
+- `MDL-WIDGET24` — a template parameter is evaluated against the widget's own context object, so
+  it takes the attribute **name**, not `$currentObject/Attr`. Left wrong, mxbuild reports
+  `CE1613 "The selected attribute … no longer exists"`.
+- `MDL-WIDGET15` — adjacent inline `dynamictext` widgets render as `<span>` with no separator, so
+  their text concatenates. It also says `Paragraph` does **not** fix this. Each line is now in its
+  own container because of that warning.
+
+### A real mxcli gap, stated by mxcli
+
+> `MDL cannot author an expression-typed template parameter yet … Mendix DOES support it: Studio
+> Pro's Edit Template Parameter dialog has a Value | Expression choice.` `[MDL-WIDGET14]`
+
+So `formatDecimal($currentObject/TemperatureC, '#0.0')` and
+`formatDateTime($currentObject/ObservedAt, 'HH:mm')` cannot be written by mxcli. The widget binds
+the raw attributes instead, which renders an unformatted decimal and a full datetime. **Recorded
+as a deviation, not a completion** — the formatting is a Studio Pro step.
+
+Note the shape of that message: it says what is impossible, that the platform supports it anyway,
+and exactly where a human does it. That is the standard a capability report should meet, and it is
+why mxcli's own diagnostics are a better authority than any summary of them.
+
+## 13. Deviations from the plan after the mxcli leg
+
+Carried forward so a reviewer does not have to diff the plan to find them:
+
+| Plan | Built | Why |
+|---|---|---|
+| `ConditionText: String(100)` | `String(200)` | MCP constructor cannot express length (§9) |
+| *(no default)* | `TemperatureC: Decimal default 0` | platform default (§9) |
+| two mapping entities + association | one entity, nested members | MDL reaches nested leaves directly (§11) |
+| `formatDecimal(...)`, `formatDateTime(...)` in the widget | raw attribute binds | `MDL-WIDGET14`, needs Studio Pro |
+| separate `OpenMeteoResponse` entity | not created | unnecessary after the simplification |
+
+None of these were silent. The first two were found by reading back with mxcli; the rest were
+reported by `mxcli check` before anything was written.
+
 ## Status of this run
 
-Steps 2, 3 and 4 complete and verified on disk: the helper entity (MCP), and the JSON structure,
-import mapping and mapping entity (mxcli). Both write paths exercised on one story.
+Steps 2-9 complete and verified on disk. Model integrity held across four exec runs:
+Unit table 1386 rows, 1386 .mxunit files on disk, exact.
 
-Step 5 is the Call REST microflow, step 7 the nanoflow, step 8 the snippet, step 10 the layout edit --
-which can ONLY go through the MCP, since mxcli would silently drop the sidebar toggles on all 33
-pages that use it. So the remaining work alternates between the two writers, and the model has to
-be saved and Studio Pro reopened between legs.
+Step 10 -- one snippet call into Siemens_UI_Module.iX_Application_Frame -- is the last model
+change, and it can ONLY go through the MCP: mxcli would silently drop two sidebar toggle widgets
+it cannot author, on the layout all 33 pages use. So Studio Pro has to be reopened for it, which
+is the third human step in this pipeline after Update security and save.
+
+Step 11 is running the app, which no tool here does.
