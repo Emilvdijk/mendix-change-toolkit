@@ -402,7 +402,7 @@ Three tools, three different closure paths, for one feature's worth of errors.
 
 ## 15. The last step cannot be done by any tool
 
-Step 10 — adding one snippet call to `Siemens_UI_Module.iX_Application_Frame`, the layout all 33
+Step 10 — adding one snippet call to `SomeUI_Module.AppFrame`, the layout all 33
 pages use — is the step that makes the feature appear. It is blocked by **two independent
 constraints**, either of which alone is enough:
 
@@ -419,7 +419,7 @@ on the module's `_Layouts` folder returns no documents either.
 **The module is not writable.** `list_modules` reports it plainly:
 
 ```json
-{"moduleName":"Siemens_UI_Module","writable":false,"fromMarketplace":true}
+{"moduleName":"SomeUI_Module","writable":false,"fromMarketplace":true}
 ```
 
 **And mxcli is already ruled out** — the plan found two `Forms$SidebarToggleButton` widgets marked
@@ -516,7 +516,7 @@ separately, and never assume a failed `exec` changed nothing.
 The hand-off checklist told the user to run:
 
 ```bash
-mxcli describe layout Siemens_UI_Module.iX_Application_Frame -p "<app>.mpr"
+mxcli describe layout SomeUI_Module.AppFrame -p "<app>.mpr"
 ```
 
 They ran it literally and got `failed to set busy_timeout: unable to open database file (14)` —
@@ -629,7 +629,7 @@ SampleApp.DS_WeatherHelper                   microflow     mxcli
 SampleApp.ACT_WeatherHelper_ToggleMinimized  nanoflow      mxcli
 SampleApp.Snippet_WeatherWidget              snippet       mxcli
 theme/web/custom-sample_app.scss             stylesheet    file write
-Siemens_UI_Module.iX_Application_Frame       layout        A PERSON
+SomeUI_Module.AppFrame       layout        A PERSON
 ```
 
 Model integrity held throughout: the `.mpr` Unit table and the `.mxunit` file count matched

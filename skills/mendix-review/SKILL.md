@@ -76,6 +76,21 @@ Changed documents by module with `+/-` magnitude. Renames appear as `{A => B}` �
 those as an unrelated delete plus add. Large `+/-` on a page is usually layout; small `+/-` on a
 microflow is often the real behaviour change.
 
+```bash
+bash "$MXDIFF/mirror-gaps.sh" <oldSha> <newSha>     # what the table above cannot show you
+```
+
+**Run both. The second one is not optional.** `review.sh --summary` reads the YAML mirror, and
+mxlint skips marketplace modules on export — so a document can change, sit in the commit, and
+appear in no table, no lint result and no invariant check. `mirror-gaps.sh` diffs the raw
+`.mxunit` census in git against the mirror and names what is missing. Add every GAP to the
+changed-document list yourself and read it with `sweep.sh ... detail` or `mxcli describe`.
+
+This bites hardest on **layouts**, which most apps do not own: one app had 33 layouts and not one
+of them in its own module, so its mirror contains no layout at all. A real review was handed a
+commit that placed a snippet on a layout, saw 9 internally consistent mirror files, and reported
+the snippet as never placed. The layout was in `sweep.sh` the whole time.
+
 **Subtract the export noise before counting anything.** Two artefacts routinely inflate the
 table several-fold, and both are tooling, not model change:
 
@@ -217,6 +232,30 @@ semantically identical — say so rather than reporting it.
 right now — the working copy — so it cannot see either side of a commit range. Do not reach for
 it here; `sweep.sh` and the YAML mirror are the only ground truth for historical state. (It is
 useful for `mendix-plan` and `explain-mendix-doc-complete`, which work on the current model.)
+
+## Never report "unused" or "not placed anywhere" from the export
+
+A claim that nothing references a document is a claim about **absence**, and every reader in this
+toolkit is silent rather than empty about what it does not cover. Three of them line up on exactly
+this question:
+
+- the YAML mirror has no marketplace modules, so a reference from a layout is not in it;
+- `mxcli refs` and `mxcli impact` index microflow calls and widget actions but **not snippet-call
+  placement** — a snippet sitting on a layout answers `(no references found)` from both;
+- `pg_read_page` elides widgets, and the MCP cannot read a snippet at all.
+
+So run the one reader that is complete:
+
+```bash
+node "$MXDIFF/usages.js" <Module.Name> [--qualified]       # from the project checkout
+```
+
+It decodes every `.mxunit` in `mprcontents/` and reports each document that names the target, with
+the property path. ~1 s over 1,386 units, and it reads no `.mpr`, so it is safe with Studio Pro
+open. `--qualified` drops bare-name noise (variable names matching an entity, typically).
+
+A real review reported `Snippet_WeatherWidget` as possibly never placed, blocking the story. It was
+on the app-wide layout, as `snippetCall4` in the center region, committed in the same commit.
 
 ## Grounding a convention claim — `search_mendix_knowledge_base`
 

@@ -42,7 +42,8 @@ gaps have moved before, and two of them moved between v0.16 and v0.24.
 | **`errorHandlingType`** per activity | ❌ | ✅ (17 on one flow) | ✅ | ⚠️ |
 | **`excluded` / `markAsUsed`** | ❌ | ✅ | ✅ | ⚠️ |
 | **`documentation`** (author's notes) | ❌ | ✅ | ✅ | ⚠️ |
-| **Callers / callees / impact** | ✅ `context`, `callers` | ❌ grep only | ❌ | ❌ |
+| **Callers / callees / impact** | ⚠️ `context`, `callers`, `refs` — misses snippet placement | ❌ grep only | ❌ | ✅ via `usages.js` |
+| **Where a snippet / page is placed** | ❌ answers "(no references found)" | ❌ layouts are not exported | ❌ cannot read a snippet | ✅ `usages.js`, ~1 s |
 | **Sequence-flow edges** | ✅ | ❌ **dropped entirely** | ❌ stubs | ✅ only source |
 | **Marketplace module contents** | ✅ | ❌ skipped on export | ✅ | ✅ |
 | **Project-wide architecture** | ✅ `graph-report` | ✅ via lint rules | ❌ | ❌ |
@@ -279,6 +280,20 @@ New, not previously recorded:
 - **mxlint truncates long filenames** in its export —
   `SUB_Invoice_SendSingl_TRUNCATED_46aa2_icroflow.yaml`. You cannot locate a document by filename
   when its name is long; grep the contents, or use the generated `app.yaml` path map.
+- **No layouts reach the mirror in the app measured.** Layouts live in marketplace modules
+  almost by default: one app owns 33 layouts and not one of them sits in its own module, so
+  `mxlint export` writes zero `Forms$Layout` files and every tool scoped by the mirror —
+  `review.sh --summary`, `lint-diff.sh`, `invariants.sh` — is blind to a layout change. Whether
+  mxlint would export a layout in an app's **own** module is untested; no app here has one.
+  `mirror-gaps.sh` reconciles the mirror against the raw `.mxunit` census and names the
+  difference.
+- **`mxcli refs` and `mxcli impact` do not index snippet-call placement.** Both answer
+  `(no references found)` for a snippet that is placed on a layout — measured on v0.24.0 against
+  two snippets, both placed on the app-wide layout, which lives in a marketplace UI module. The silence is convincing because the same
+  commands *do* resolve microflow calls (`MICROFLOW … call`) and widget actions (`SNIPPET … action`)
+  correctly. `usages.js` scans the BSON instead and finds the `Forms$SnippetCall.Form` property.
+- **`mxcli SEARCH` is a string search, not a usage search.** `SEARCH 'Snippet_WeatherWidget'`
+  returns the seven literals *inside* that snippet and nothing that references it.
 - **mxlint names page files `Forms$Page.yaml`**, not `Pages$Page.yaml`.
 - A full export of this project takes **18.5 s** and writes 1,411 files across 24 content roots,
   totalling **269 MB** on disk. That is the real cost of the mirror `build-history.sh` maintains,

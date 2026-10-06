@@ -167,6 +167,8 @@ Delete it any time; it rebuilds.
 | What does the logic now do differently? | `mdl-diff.sh` |
 | Does the change introduce quality/security issues? | `lint-diff.sh` |
 | Sources disagree / need certainty / flow edges? | `sweep.sh` |
+| Did the mirror miss anything this range changed? | `mirror-gaps.sh` |
+| Where is this document used — is this snippet placed? | `usages.js` |
 
 ---
 
@@ -195,6 +197,14 @@ Found by testing, not assumed:
   "error finding MPR file". Handled by `to_native()` in `lib.sh`.
 - **Marketplace/appstore modules are skipped** by mxlint export, so they never appear in
   YAML diffs. `sweep.sh` still sees them. (Observed on one project: `NanoflowCommons`, `OIDC`.)
+  **This is not a marginal gap: layouts are normally marketplace-owned.** One app: 33 layouts,
+  0 of them in the app's own module, so the mirror contains no layout at all and a change to
+  one is invisible to `review.sh --summary`, `lint-diff.sh` and `invariants.sh` alike. Run
+  `mirror-gaps.sh` on every range.
+- **`mxcli refs` and `mxcli impact` do not index snippet-call placement.** A snippet sitting on
+  a layout reports `(no references found)` from both — measured on v0.24.0, two snippets, both
+  placed. Microflow calls and widget actions ARE indexed, which is what makes the silence
+  convincing. `usages.js` reads the BSON and finds it.
 - **mxlint truncates long filenames** on export —
   `SUB_Invoice_SendSingl_TRUNCATED_46aa2_icroflow.yaml`. A document with a long name cannot be
   found by filename; grep the contents or use the generated `app.yaml` path map. Pages are
@@ -224,7 +234,9 @@ tools/
   mxunit.js                  BSON decoder for .mxunit files
   mxdiff.js                  structural diff, ID-aligned, noise-filtered
   info.js                    "$Type|Name" of a unit
+  mirror-gaps.sh             documents the range changed that the YAML mirror cannot see
   findwidget.js              locate a widget inside a page/snippet
+  usages.js                  who references a document, from BSON (finds snippet placement)
   expand-pseudocode.js       split mxlint pseudocode into diffable .flow.txt
 skills/
   mendix-review/

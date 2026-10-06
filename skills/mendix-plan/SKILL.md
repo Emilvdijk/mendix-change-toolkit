@@ -44,7 +44,7 @@ If the Studio Pro MCP is available, call `list_modules` once, up front, and keep
 module comes back with two flags that decide whether a change is even possible:
 
 ```json
-{"moduleName":"Siemens_UI_Module","writable":false,"fromMarketplace":true}
+{"moduleName":"SomeUI_Module","writable":false,"fromMarketplace":true}
 {"moduleName":"SampleApp","writable":true,"fromMarketplace":false}
 ```
 
@@ -126,6 +126,15 @@ mxcli callers  "<Module.Microflow>"     # the regression surface
 mxcli callees  "<Module.Microflow>"     # what it depends on
 mxcli impact   "<Module.Entity>"        # everything touching an entity
 mxcli refs     "<Module.Document>"      # where it is referenced
+```
+
+**`refs` and `impact` have a hole: they do not index snippet-call placement.** A snippet sitting
+on a layout or a page answers `(no references found)` from both, and the YAML export has no
+layouts at all. When the question is *where does this appear in the UI*, use the BSON reader
+instead — it is complete, takes about a second, and is safe with Studio Pro open:
+
+```bash
+node "$MXDIFF/usages.js" "<Module.Document>" --qualified
 ```
 
 Work outwards from the most specific match, and establish for each candidate:

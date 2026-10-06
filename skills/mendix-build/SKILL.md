@@ -157,6 +157,19 @@ substitute one that can, rather than skipping it.
 At every gate: **say precisely what you need, and what you will do next.** "Close Studio Pro and
 tell me" is actionable. "Studio Pro must be closed" is not.
 
+**Verify a gate the developer says they completed — do not take it on trust, and do not take a
+tool's silence for it either.** Placement is the case that bites: after someone places a snippet
+on a layout by hand,
+
+```bash
+node "$MXDIFF/usages.js" "<Module.Snippet>" --qualified
+```
+
+is the only reader that can confirm it. `mxcli refs` and `mxcli impact` both answer
+`(no references found)` for a correctly placed snippet, the YAML export contains no layouts at
+all, and the MCP cannot read a snippet. A later review, running on the same blind sources,
+reported a placed snippet as missing and called the story blocked.
+
 ## Step 5 — write the build report
 
 To the path you were given. Structure:
