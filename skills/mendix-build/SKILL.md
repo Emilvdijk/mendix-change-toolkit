@@ -72,7 +72,10 @@ Measured routing on Mendix 11.12.4 — **re-check, do not memorise**:
 | Nanoflow | **mxcli only** |
 | Snippet, page widget tree | **mxcli only** — the MCP cannot even read a snippet |
 | Allowed roles / `GRANT EXECUTE` | **mxcli only** |
-| Layout | **a person** — no MCP layout type, and mxcli drops widgets it cannot author |
+| Layout: a new one, or a widget tree rewrite | **a person** — no MCP layout type, and mxcli drops widgets it cannot author |
+| Layout: drop ONE widget from an existing one | mxcli `alter layout … drop widget <id>` — edits in place, leaves the rest byte-identical |
+| Layout: drop a layout-grid COLUMN, or rename a layout | **a person** — `drop widget col3` answers `widget "col3" not found` and applies nothing; no tool anywhere can rename a layout |
+| Remove a module | **a person** in Studio Pro — and see Step 3f, it leaves the user roles behind |
 | Anything in a `writable: false` module | **a person** |
 | CSS / theme files | plain file write |
 | `ped_check_errors`, Update security, save | MCP / a person |
@@ -141,7 +144,21 @@ The plan gives one per step. Run it now, not later. If the `Check:` names a tool
 the thing — `mxcli describe` cannot show allowed roles, commit flags or error state — say so and
 substitute one that can, rather than skipping it.
 
-**3g. Record the step as done, skipped, or deviated**, with one line of why.
+**3g. After removing a module, check the user roles. They are not cleaned up.**
+
+Measured: a module deleted in Studio Pro disappeared from `show modules` and `list_modules`, the
+save completed, the unit count moved — and **both project user roles still named its module role**.
+Studio Pro reported no error, because project security was `Off`. Nothing in the tooling will tell
+you: `refs <Module>.<Role>` answers `(no references found)` while two roles hold it.
+
+```
+mxcli describe user role <Name>                 -- read the truth
+alter user role <Name> { remove module roles (<Module>.<Role>); };
+```
+
+Then `grep -r '<ModuleName>\.' mprcontents/` for anything else still pointing at it.
+
+**3h. Record the step as done, skipped, or deviated**, with one line of why.
 
 ## Step 4 — the gates, and what to do at each
 
@@ -151,7 +168,7 @@ substitute one that can, rather than skipping it.
 | MCP needs Studio Pro **open** | the server *is* Studio Pro | stop, ask, continue when told |
 | "Update security" after an access-rule change | no tool exposes that button | stop, ask |
 | Saving an MCP write | no save tool exists in the 18 | stop, ask |
-| A layout, or any `writable: false` module | no tool can author it | leave it to the developer, say exactly what to do |
+| A layout rename, a layout-grid column, or any `writable: false` module | no tool can author it | leave it to the developer, say exactly what to do |
 | Running the app | no tool here does it | leave it to the developer |
 
 At every gate: **say precisely what you need, and what you will do next.** "Close Studio Pro and
@@ -169,6 +186,38 @@ is the only reader that can confirm it. `mxcli refs` and `mxcli impact` both ans
 `(no references found)` for a correctly placed snippet, the YAML export contains no layouts at
 all, and the MCP cannot read a snippet. A later review, running on the same blind sources,
 reported a placed snippet as missing and called the story blocked.
+
+## Step 4b — check the whole project before you write the report
+
+`ped_check_errors` is per document and only sees pages, microflows, nanoflows and domain models.
+A build can finish with every document it touched reporting `No errors found` and still leave the
+project broken, because snippets, layouts, navigation and project security are document classes the
+MCP cannot open at all — measured on project security, expected on the rest.
+
+Mendix ships a checker that can. Run it once, at the end:
+
+```bash
+# the version must match the project; several live side by side
+"/c/Program Files/Mendix/<version>/modeler/mx.exe" check <App>.mpr
+```
+
+```
+Checking app for errors...
+[error] [CE0129] "Administrator password has not been set." at Security
+The app contains: 1 errors.
+```
+
+Measured on the reference run: the MCP reported `No errors found` across **50 documents** — every
+page, microflow and nanoflow in the app plus six domain models — and `mx.exe check` then found an
+error at `Security`, which is not a document the MCP can see.
+
+- **Run it on a copy** (`.mendix-cache/dash-scratch/mxcheck-copy`), or with Studio Pro closed. It
+  loads the `.mpr` and the IDE holds a lock. Expect a file in that copy to stay locked afterwards;
+  the folder is git-ignored, so say so and leave it.
+- **Put the exact output in the report**, errors or none. "0 errors" from a project-wide checker is
+  the strongest statement a build can make about itself, and it is worth two lines.
+- It does not replace the per-step `ped_check_errors` gate. That one tells you *which* write broke
+  something, while it is still the last thing you did.
 
 ## Step 5 — write the build report
 
@@ -190,10 +239,22 @@ Anything that differs from what the plan specified, and why. Platform-supplied d
 Numbered, literal, runnable. Real file names — never a `<placeholder>` in a command
 somebody is meant to type.
 
+## Validator result
+The per-document `ped_check_errors` outcome AND the project-wide `mx.exe check` output,
+verbatim. Say which documents the MCP could not see.
+
 ## How to review this
 The exact `git diff` / `git status` invocation for the checkout, and what a clean diff looks
 like (the `.mpr` plus one `.mxunit` per document touched — more than that means something
 else moved).
+
+## Changes in the working tree this build did not make
+Name them, so the reviewer knows what to ignore. Two sources, both measured: Studio Pro
+STAGES ITS OWN SAVES in the git index, so `git diff --cached` is not empty and later mxcli
+writes sit unstaged on top (files show as `MM`); and building or running the app regenerates
+action stubs — one run left 48 modified files under `javascriptsource/` and `javasource/`,
+none of them part of the story. Deleting a module DOES own its `themesource/<module>/`
+folder going away; that one is yours.
 
 ## Nothing was committed
 State it plainly, every time.

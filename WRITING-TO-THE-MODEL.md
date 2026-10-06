@@ -1,7 +1,9 @@
 # Writing to a Mendix model from an agent — what actually happens
 
-Field notes from the first instrumented write run: DAS-2 (a weather widget) against a scratch
-app, Mendix 11.12.4, Studio Pro MCP server on `localhost:7782`, mxcli v0.24.0, 2026-10-02/03.
+Field notes from two instrumented write runs against scratch apps, Mendix 11.12.4, Studio Pro MCP
+server on `localhost:7782`, mxcli v0.24.0: a weather widget built from nothing (§1–18, 2026-10-02/03)
+and a starter-module removal (§19–23, 2026-10-06). The second run is the less interesting change and
+it corrected one of the first run's conclusions — see §19.
 
 Everything here was measured during the run. Where a published capability list disagrees with
 what the server did, the server wins and the disagreement is recorded.
@@ -379,6 +381,12 @@ So **snippets cannot be error-checked over MCP at all**. Any error in the widget
 unreachable from either tool: mxcli has no model validator, and the MCP refuses the document type.
 Those errors are visible only to a person with Studio Pro open.
 
+> **Corrected on 2026-10-06 (§19): that last sentence is wrong.** There is a third validator —
+> `mx.exe check`, shipped with Studio Pro — which runs the same consistency check over the whole
+> project, headless, and does see snippets, layouts, navigation and project security. "Unreachable
+> from either tool" was true of the two tools an agent *writes* with, and was never true of the
+> tooling available to it. The rest of this section stands.
+
 ### What this changes
 
 1. **Run the plan's `Check:` line after every step, before the next write.** Not at the end.
@@ -614,6 +622,153 @@ Two things worth keeping from the probes:
   not part of this setup and appears nowhere in public documentation, so it stays an unknown — but
   if it were connected it would close the "no save tool" gap from §1, which is one of the five
   human steps.
+
+---
+
+# Second run — a module removal, 2026-10-06
+
+Notes from a second instrumented run, on a different and much smaller app: a story asking for the
+Mendix starter module to be removed. Same versions (Mendix 11.12.4, mxcli v0.24.0), fourteen MDL
+scripts, two legs that needed a person. It is a far less interesting change than §1–18 and it
+produced four findings that change the advice above.
+
+## 19. There is a third validator, and it sees what the other two cannot
+
+§14 concluded that an error in a snippet is "unreachable from either tool: mxcli has no model
+validator, and the MCP refuses the document type. Those errors are visible only to a person with
+Studio Pro open."
+
+**That is wrong, and it was wrong when it was written.** Mendix ships a command-line checker with
+Studio Pro itself:
+
+```
+"C:\Program Files\Mendix\<version>\modeler\mx.exe" check <App>.mpr
+```
+
+It runs the same consistency check as the Studio Pro error list, over the **whole project**, with
+no IDE open. Measured output on a project with one outstanding error:
+
+```
+Loading the mpr file.
+The mpr file version is '11.12.4'.
+Checking app for errors...
+[error] [CE0129] "Administrator password has not been set." at Security
+The app contains: 1 errors.
+```
+
+That error is at **Security** — a document class `ped_check_errors` cannot open at all. In the
+same run, the MCP had just reported `No errors found` across **50 documents**: every page (16),
+microflow (15) and nanoflow (13) in the app plus six domain models. Fifty clean documents and a
+project that does not check. The MCP was not wrong; it was answering a narrower question than
+anyone reading it would assume.
+
+### What each validator actually covers
+
+| | `mxcli check` | `ped_check_errors` (MCP) | `mx.exe check` |
+|---|---|---|---|
+| What it validates | MDL syntax and references | Studio Pro's model check, **per document** | Studio Pro's model check, **per project** |
+| Pages, microflows, nanoflows, domain models | ❌ | ✅ | ✅ |
+| Snippets | ❌ | ❌ `No API registered for unit type 'Pages$Snippet'` | ⬤ expected, not measured |
+| Layouts, navigation | ❌ | ❌ no document type | ⬤ expected, not measured |
+| Project security | ❌ | ❌ no document type | ✅ **measured** |
+| Needs Studio Pro open | no | **yes** | no |
+| Catches a bad script before it applies | ✅ (§12) | ❌ | ❌ |
+
+They are three different checks, and the middle column is the one most likely to be mistaken for
+the right-hand one.
+
+### How to run it without breaking the run
+
+- **Run it on a copy, or with Studio Pro closed.** It loads the `.mpr`, and the IDE holds a lock.
+  Copying the project into `.mendix-cache/dash-scratch/mxcheck-copy` costs seconds and leaves the
+  checkout untouched. (Expect at least one file in that copy to stay locked afterwards; it is
+  git-ignored, so leaving it is harmless.)
+- **The version must match the project.** Several Studio Pro versions sit side by side under
+  `C:\Program Files\Mendix\`; `mx.exe` from the wrong one will refuse the `.mpr` version. Read the
+  version from the project rather than guessing, and prefer the newest installed that is ≥ it.
+- **It is not a replacement for the per-document check during a build.** `ped_check_errors` tells
+  you which document broke, immediately after you wrote it. `mx.exe check` tells you the project
+  is sound, once, at the end. Use the first as the per-step gate and the second as the final one.
+
+### What this changes
+
+§14's "invisible to the tooling entirely" group was overstated. The honest statement is: **errors
+in project security are invisible to the two tools an agent writes with, and visible to a third one
+it can also run.** The same is very likely true of snippets, layouts and navigation — this is Studio
+Pro's own checker, and those classes are in the project it loads — but no run here has had a broken
+one to prove it with, so treat that as expected rather than measured, and confirm it the first time
+you do. Only the last category — something that
+is valid but wrong, a CSS variable that does not exist (§17), a button that does nothing — is
+genuinely out of reach of every validator and needs a person looking at the screen.
+
+## 20. Deleting a module does not clean up the user roles that reference it
+
+A module was deleted in Studio Pro (the only path — see §15 and the routing table in
+`mendix-build`), the save completed, and `MyFirstModule` was gone from `show modules` and from
+`list_modules`. The seven units disappeared and the `.mxunit` count moved as expected.
+
+**Both project user roles still named `MyFirstModule.User`.** The project security unit had not
+been touched since before the delete, and Studio Pro reported no error, because security was at
+`Off` — nothing validates a dangling module role at that level.
+
+The fix is a write the plan had not foreseen:
+
+```
+alter user role Administrator { remove module roles (MyFirstModule.User); };
+alter user role User          { remove module roles (MyFirstModule.User); };
+```
+
+**Expect this on any module removal.** Check the user roles after the delete, not before, and check
+them with `describe user role` — not with `refs` (§21). A `grep` for `<ModuleName>.` across
+`mprcontents/` is the cheap belt-and-braces confirmation that nothing else still points at it.
+
+## 21. `mxcli refs` does not index user-role membership either
+
+`refs MyFirstModule.User` answered **"no references found"** while two project user roles held that
+exact module role. This is the same shape of silence as snippet placement in `MODEL-READING.md`:
+the answer is not "I could not find it", it is a confident nothing, and it is the kind of nothing a
+report repeats as "safe to delete".
+
+Verify role membership with `describe user role <Name>`, or by reading the project security unit.
+Never from `refs`.
+
+## 22. Two more things no tool can author on a layout
+
+Both were hit while removing a widget from a copied layout, and both extend the layout findings in
+`MODEL-READING.md`:
+
+- **Nothing can rename a layout.** `mxcli rename` has no layout type. Re-probed over the MCP with
+  Studio Pro open: `Pages$Layout` and `Forms$Layout` are unknown document types, `ped_list_folder`
+  on the module does not list the layout at all, and `pg_read_page` answers `Page not found`. A
+  layout copied in Studio Pro therefore keeps the name Studio Pro gave it (`<Name>_2`) until a
+  person renames it — which is also the only way the references get updated.
+- **`alter layout … drop widget <column>` cannot drop a layout-grid column.** It answers
+  `Error: failed to drop: widget "col3" not found` and applies nothing. Only the widgets *inside*
+  the column can be dropped, which leaves an empty AutoFill column behind. If that gap is visible
+  in the rendered page, deleting the column is a person's job.
+
+`alter layout … drop widget <id>` on an ordinary widget works, edits in place, and leaves the rest
+of the layout byte-identical — which matters, because rewriting a layout drops the constructs mxcli
+cannot author (`Forms$SidebarToggleButton` among them).
+
+## 23. The working tree will show changes this run did not make
+
+Two sources, both measured, both easy to misread as part of the change:
+
+- **Studio Pro stages its own saves in the git index.** After a save, `git diff --cached` is not
+  empty and nobody staged anything. Later mxcli writes land unstaged on top, so the `.mpr` and any
+  unit touched by both shows as `MM`. A build that reports "nothing staged" without looking is
+  wrong; a build that reports the staged content as its own work is worse.
+- **Building or running the app regenerates action stubs.** One run left 48 modified files under
+  `javascriptsource/` (datawidgets, nanoflowcommons, webactions) and `javasource/`, each with a new
+  generated header comment and import list. None of it was part of the story.
+
+Both belong in the build report as *changes in the working tree this run did not make*, named and
+separated from the change set, so the person reviewing the diff knows what to ignore. Deleting a
+module also removes `themesource/<module>/` and creates `themesource/<new module>/` — those **are**
+part of the change.
+
+---
 
 ## Status of this run — complete
 

@@ -44,6 +44,7 @@ gaps have moved before, and two of them moved between v0.16 and v0.24.
 | **`documentation`** (author's notes) | ❌ | ✅ | ✅ | ⚠️ |
 | **Callers / callees / impact** | ⚠️ `context`, `callers`, `refs` — misses snippet placement | ❌ grep only | ❌ | ✅ via `usages.js` |
 | **Where a snippet / page is placed** | ❌ answers "(no references found)" | ❌ layouts are not exported | ❌ cannot read a snippet | ✅ `usages.js`, ~1 s |
+| **Which user roles hold a module role** | ❌ `refs` answers "(no references found)" | ✅ project security is exported | ❌ | ⚠️ grep |
 | **Sequence-flow edges** | ✅ | ❌ **dropped entirely** | ❌ stubs | ✅ only source |
 | **Marketplace module contents** | ✅ | ❌ skipped on export | ✅ | ✅ |
 | **Project-wide architecture** | ✅ `graph-report` | ✅ via lint rules | ❌ | ❌ |
@@ -296,6 +297,16 @@ New, not previously recorded:
   two snippets, both placed on the app-wide layout, which lives in a marketplace UI module. The silence is convincing because the same
   commands *do* resolve microflow calls (`MICROFLOW … call`) and widget actions (`SNIPPET … action`)
   correctly. `usages.js` scans the BSON instead and finds the `Forms$SnippetCall.Form` property.
+- **`mxcli refs` does not index user-role membership either.** `refs <Module>.<Role>` answers
+  `(no references found)` while project user roles still hold that module role — measured after a
+  module delete, where two of them did and Studio Pro reported no error because security was `Off`.
+  Read `describe user role <Name>`, or the project security unit, and never conclude "unused" from
+  `refs` alone.
+- **Nothing can rename a layout.** `mxcli rename` has no layout type, and over the MCP
+  `Pages$Layout` and `Forms$Layout` are unknown document types, `ped_list_folder` does not list the
+  layout, and `pg_read_page` answers `Page not found`. A layout copied in Studio Pro keeps the name
+  Studio Pro gave it (`<Name>_2`) until a person renames it there — which is also the only thing
+  that updates the references to it.
 - **`mxcli SEARCH` is a string search, not a usage search.** `SEARCH 'Snippet_WeatherWidget'`
   returns the seven literals *inside* that snippet and nothing that references it.
 - **mxlint names page files `Forms$Page.yaml`**, not `Pages$Page.yaml`.

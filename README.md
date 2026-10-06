@@ -209,6 +209,19 @@ Found by testing, not assumed:
   a layout reports `(no references found)` from both — measured on v0.24.0, two snippets, both
   placed. Microflow calls and widget actions ARE indexed, which is what makes the silence
   convincing. `usages.js` reads the BSON and finds it.
+- **`mxcli refs` does not index user-role membership either.** `refs <Module>.<Role>` answers
+  `(no references found)` while project user roles still hold that module role — measured after a
+  module delete, where two of them did. Deleting a module does NOT clean the user roles up, and
+  Studio Pro reports nothing while security is `Off`. Read `describe user role`.
+- **Nothing can rename a layout**, in any tool: `mxcli rename` has no layout type, and the MCP does
+  not know `Pages$Layout` / `Forms$Layout`. A layout copied in Studio Pro keeps the `<Name>_2` it
+  was given until a person renames it there.
+- **There is a third validator nobody mentions:** `mx.exe check <App>.mpr`, shipped with Studio Pro
+  at `C:/Program Files/Mendix/<version>/modeler/`. It runs Studio Pro's consistency check over the
+  WHOLE project, headless. Measured: 50 documents clean over the MCP, then one error at `Security`
+  from `mx.exe check` — a class `ped_check_errors` cannot open at all. Snippets, layouts and
+  navigation are expected to be covered for the same reason and have not been proven here.
+  Run it on a copy, or with Studio Pro closed, and match the version to the project.
 - **mxlint truncates long filenames** on export —
   `SUB_Invoice_SendSingl_TRUNCATED_46aa2_icroflow.yaml`. A document with a long name cannot be
   found by filename; grep the contents or use the generated `app.yaml` path map. Pages are

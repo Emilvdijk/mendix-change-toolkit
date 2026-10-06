@@ -263,6 +263,10 @@ this question:
 - `mxcli refs` and `mxcli impact` index microflow calls and widget actions but **not snippet-call
   placement** — a snippet sitting on a layout answers `(no references found)` from both;
 - `pg_read_page` elides widgets, and the MCP cannot read a snippet at all.
+- `mxcli refs` does not index **user-role membership** either: `refs <Module>.<Role>` answers
+  `(no references found)` while project user roles still hold it. Measured after a module delete,
+  where two roles kept a role of the deleted module and nothing reported an error, because project
+  security was `Off`. Read `describe user role`, or the project security unit.
 
 So run the one reader that is complete:
 
