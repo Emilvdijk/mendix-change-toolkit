@@ -1,27 +1,35 @@
 #!/usr/bin/env bash
-# Which documents did this range change that the mxlint mirror cannot see?
+# Which documents did this range change that the mxlint mirror cannot see - and how to read them.
 #
-#   bash mirror-gaps.sh <shaA> <shaB>
+#   bash mirror-gaps.sh <shaA> <shaB> [--all] [--limit N] [--json]
 #
 # The mirror is the change list every other step is scoped by: review.sh --summary,
-# lint-diff.sh and invariants.sh all read it. It is NOT the whole commit - mxlint
-# skips marketplace modules on export - and the raw .mxunit blobs in git are the only
-# census that is complete. Anything printed as GAP changed in the range and appears
-# in NO other output of this toolkit.
+# lint-diff.sh and invariants.sh all read it. It is NOT the whole commit - mxlint skips
+# marketplace modules on export - and the raw .mxunit blobs in git are the only complete
+# census. Anything printed as a GAP changed in the range and appears in NO other output
+# of this toolkit, so each one comes with the command that reads it.
 #
-# Measured: a snippet was placed on a layout in a marketplace module. The
-# mirror diff showed 9 files, all internally consistent, and the review concluded the
-# snippet had never been placed. sweep.sh had the layout the whole time.
+# Measured: a snippet was placed on a layout in a marketplace module. The mirror diff
+# showed 9 files, all internally consistent, and the review concluded the snippet had
+# never been placed. sweep.sh had the layout the whole time.
+#
+# Volume: a marketplace module VERSION bump rewrites hundreds of documents. Those are
+# reported as an upgrade with a count instead of one line each; --all overrides.
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
 need git; need node
-[ $# -ge 2 ] || die "usage: mirror-gaps.sh <shaA> <shaB>"
+[ $# -ge 2 ] || die "usage: mirror-gaps.sh <shaA> <shaB> [--all] [--limit N] [--json]"
 
-BASE="$1"; HEAD_="$2"
+BASE_REF="$1"; HEAD_REF="$2"; shift 2
 REPO="$(repo_root)"
 MIRROR="$(mirror_dir)"
 [ -d "$MIRROR/.git" ] || die "no mirror at $MIRROR - run build-history.sh first"
+
+# Resolve against the MAIN repo: a relative ref would otherwise resolve against the
+# worktree, which sits at whatever commit was checked out last.
+BASE="$(git -C "$REPO" rev-parse --verify "${BASE_REF}^{commit}")" || die "bad ref: $BASE_REF"
+HEAD_="$(git -C "$REPO" rev-parse --verify "${HEAD_REF}^{commit}")" || die "bad ref: $HEAD_REF"
 
 A="$(mirror_tag "$REPO" "$BASE")"; B="$(mirror_tag "$REPO" "$HEAD_")"
 for t in "$A" "$B"; do
@@ -29,53 +37,19 @@ for t in "$A" "$B"; do
     || die "$t not in mirror - run build-history.sh for that range first"
 done
 
-TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-git -C "$MIRROR" diff --name-only -M "$A" "$B" > "$TMP/mirror.txt"
-
-DOL='$'
-covered=0; gaps=0
-
-while read -r st p rest; do
-  [ -z "${p:-}" ] && continue
-  case "$p" in *.mxunit) ;; *) continue ;; esac
-
-  src="$HEAD_"; [ "${st:0:1}" = "D" ] && src="$BASE"
-  git show "$src:$p" > "$TMP/u.bin" 2>/dev/null || continue
-  info="$(node "$TOOLS_DIR/info.js" "$TMP/u.bin" 2>/dev/null)" || continue
-  type="${info%%|*}"; name="${info##*|}"
-  short="${type##*${DOL}}"
-
-  # Folders and module wrappers are containers, not documents: the export has no file for them.
-  case "$type" in
-    "Projects${DOL}Folder"|"Projects${DOL}ModuleImpl"|"Projects${DOL}Project") continue ;;
-  esac
-
-  # Covered when the mirror diff holds a path for it: "<Name>.<Area>$<Type>.yaml", or
-  # "<Area>$<Type>.yaml" for the per-module singletons that carry no document name.
-  # mxlint truncates long filenames, so a prefix match is the honest test.
-  stem="${name:0:16}"
-  hit=0
-  while IFS= read -r m; do
-    b="${m##*/}"
-    case "$b" in
-      "${stem}"*"${DOL}${short}.yaml") hit=1; break ;;
-      *"${DOL}${short}.yaml") [ "$name" = "(unnamed)" ] && { hit=1; break; } ;;
-    esac
-  done < "$TMP/mirror.txt"
-
-  if [ "$hit" -eq 1 ]; then
-    covered=$((covered+1))
-  else
-    gaps=$((gaps+1))
-    echo "GAP  $st  $type|$name   <- $p"
+# A gap can only be named as <type>:<Module.Name> if the module is resolved, and only
+# mxcli can do that - against the worktree copy, never the checkout Studio Pro has open.
+WTARGS=()
+WT="$(cache_dir)/mxdiff-worktree"
+if command -v mxcli >/dev/null 2>&1 && [ -e "$WT/.git" ]; then
+  assert_project_free "$WT"
+  warn_if_main_open "$REPO"
+  if git -C "$WT" checkout -q --detach "$HEAD_" 2>/dev/null; then
+    WTARGS=(--worktree "$WT" --mpr "$(basename "$(mpr_path "$REPO")")")
   fi
-done < <(git -C "$REPO" diff --name-status "$BASE" "$HEAD_" -- mprcontents)
-
-echo
-echo ">> $covered document(s) covered by the mirror, $gaps gap(s)."
-if [ "$gaps" -gt 0 ]; then
-  echo ">> Every GAP above is invisible to review.sh --summary, lint-diff.sh and invariants.sh."
-  echo ">> Read it with:  bash sweep.sh <shaA> <shaB> detail      (structural diff)"
-  echo ">>                mxcli describe <type> <Module.Name>     (current state, Studio Pro closed)"
 fi
-exit 0
+
+exec node "$TOOLS_DIR/mirror-gaps.js" \
+  --repo "$REPO" --mirror "$MIRROR" \
+  --base "$BASE" --head "$HEAD_" --tag-a "$A" --tag-b "$B" \
+  "${WTARGS[@]+"${WTARGS[@]}"}" "$@"

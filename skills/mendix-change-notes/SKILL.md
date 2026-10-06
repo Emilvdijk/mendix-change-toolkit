@@ -39,6 +39,7 @@ git log --oneline --all --grep="TICKET-123"                 # commits for a stor
 git log --oneline <oldest>..<newest>                     # what the authors said
 bash "$MXDIFF/build-history.sh" '<oldest>^..<newest>'    # ~30s per commit, incremental
 bash "$MXDIFF/review.sh" '<oldest>..<newest>' --summary  # what actually changed
+bash "$MXDIFF/mirror-gaps.sh" <oldSha> <newSha>  # and what that misses
 bash "$MXDIFF/mdl-diff.sh" <oldSha> <newSha> Module.SUB_Foo Module.ACT_Bar
 ```
 

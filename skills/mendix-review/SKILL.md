@@ -82,14 +82,34 @@ bash "$MXDIFF/mirror-gaps.sh" <oldSha> <newSha>     # what the table above canno
 
 **Run both. The second one is not optional.** `review.sh --summary` reads the YAML mirror, and
 mxlint skips marketplace modules on export — so a document can change, sit in the commit, and
-appear in no table, no lint result and no invariant check. `mirror-gaps.sh` diffs the raw
-`.mxunit` census in git against the mirror and names what is missing. Add every GAP to the
-changed-document list yourself and read it with `sweep.sh ... detail` or `mxcli describe`.
+appear in no table, no lint result and no invariant check. `mirror-gaps.sh` reconciles the raw
+`.mxunit` census in git against the mirror, names what is missing, and prints the command that
+reads each one.
+
+**Then read them, and put them in the changed-document table.** A gap is not a footnote about
+tooling; it is a document the commit changed. They are usually the smallest diffs in the range and
+occasionally the whole point of it:
+
+```bash
+bash "$MXDIFF/mdl-diff.sh" <oldSha> <newSha> layout:SomeUI_Module.AppFrame
+```
+
+`mdl-diff.sh` goes through mxcli against a worktree checkout, not through the mirror, so it reads
+marketplace documents as readably as any other — the example above is one line of diff for a
+snippet added to a layout. Pass the type explicitly as `<type>:<Module.Name>`, which is what
+`mirror-gaps.sh` prints: mxcli's auto-detect does not know layouts and will claim the document
+cannot be described. For a type mxcli cannot describe at all, fall back to `sweep.sh ... detail`.
 
 This bites hardest on **layouts**, which most apps do not own: one app had 33 layouts and not one
 of them in its own module, so its mirror contains no layout at all. A real review was handed a
 commit that placed a snippet on a layout, saw 9 internally consistent mirror files, and reported
-the snippet as never placed. The layout was in `sweep.sh` the whole time.
+the snippet as never placed — blocking a finished story.
+
+**A marketplace module upgrade is a different animal.** A version bump rewrites hundreds of
+documents at once, and `mirror-gaps.sh` reports it as an upgrade with a count rather than listing
+them. Review it as an upgrade — which module, which versions, what the release notes say, and
+whether it overwrote a local edit — and say plainly in the report that you did not read the
+documents individually. Do not let one upgrade turn a deep pass into a sweep over churn.
 
 **Subtract the export noise before counting anything.** Two artefacts routinely inflate the
 table several-fold, and both are tooling, not model change:
@@ -348,6 +368,11 @@ short list of what was clean, so the reader knows it was checked.
 and name every behaviour-bearing document that was not read. A reader cannot tell the difference
 between "read it, it was fine" and "never opened it" unless you tell them, and the second one is
 what lets a bug reach a tester.
+
+**The denominator includes the mirror gaps.** Counting only what `review.sh --summary` listed
+reports full coverage of an incomplete census. If an upgrade put the gaps over the listing limit,
+say so in that line — "plus 236 documents rewritten by a platform upgrade, reviewed as an
+upgrade" is honest; leaving them out of the count is not.
 
 **One row per document in the changed-document table.** Never collapse several documents into a
 single row — `BackgroundTask (new module) | 16 microflows, 2 nanoflows, 4 enums` reads as

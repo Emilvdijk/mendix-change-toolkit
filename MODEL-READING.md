@@ -287,6 +287,10 @@ New, not previously recorded:
   mxlint would export a layout in an app's **own** module is untested; no app here has one.
   `mirror-gaps.sh` reconciles the mirror against the raw `.mxunit` census and names the
   difference.
+- **`mxcli describe` auto-detect does not know layouts.** A bare qualified name answers
+  `no describable document named ...` — indistinguishable from "this type cannot be described" —
+  while `describe layout <Module.Name>` returns the whole thing. That one missing word was enough
+  to make `mdl-diff.sh` report a marketplace layout as unreadable; it now takes `<type>:<name>`.
 - **`mxcli refs` and `mxcli impact` do not index snippet-call placement.** Both answer
   `(no references found)` for a snippet that is placed on a layout — measured on v0.24.0 against
   two snippets, both placed on the app-wide layout, which lives in a marketplace UI module. The silence is convincing because the same

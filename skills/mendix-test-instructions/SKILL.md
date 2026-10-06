@@ -40,6 +40,7 @@ derived from it would be fiction. No toolkit, no test instructions.
 git log --oneline --all --grep="TICKET-123"                    # commits for a ticket
 bash "$MXDIFF/build-history.sh" '<oldest>^..<newest>'       # ~30s per commit, incremental
 bash "$MXDIFF/review.sh" '<oldest>..<newest>' --summary
+bash "$MXDIFF/mirror-gaps.sh" <oldSha> <newSha>       # changes the mirror cannot see
 bash "$MXDIFF/invariants.sh" '<oldest>..<newest>'           # mechanical defect checks
 bash "$MXDIFF/mdl-diff.sh" <oldSha> <newSha> Module.SUB_Foo Module.ACT_Bar
 ```

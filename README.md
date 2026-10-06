@@ -201,6 +201,10 @@ Found by testing, not assumed:
   0 of them in the app's own module, so the mirror contains no layout at all and a change to
   one is invisible to `review.sh --summary`, `lint-diff.sh` and `invariants.sh` alike. Run
   `mirror-gaps.sh` on every range.
+- **`mxcli describe` auto-detect does not know layouts.** `describe Module.Layout` answers
+  "no describable document named ...", which reads like the document being undescribable;
+  `describe layout Module.Layout` returns all 72 lines of it. `mdl-diff.sh` therefore accepts
+  `<type>:<Module.Name>`, and `mirror-gaps.sh` prints the typed form for you.
 - **`mxcli refs` and `mxcli impact` do not index snippet-call placement.** A snippet sitting on
   a layout reports `(no references found)` from both — measured on v0.24.0, two snippets, both
   placed. Microflow calls and widget actions ARE indexed, which is what makes the silence
@@ -228,13 +232,14 @@ tools/
   doctor.sh                  dependency and project check
   build-history.sh           replay commits -> YAML mirror repo
   review.sh                  changed-document tables + YAML diffs
-  mdl-diff.sh                readable before/after logic via mxcli MDL
+  mdl-diff.sh                readable before/after logic via mxcli MDL (<type>:<Module.Name> too)
   lint-diff.sh               mxlint over only the changed documents
   sweep.sh                   raw BSON ground-truth diff
   mxunit.js                  BSON decoder for .mxunit files
   mxdiff.js                  structural diff, ID-aligned, noise-filtered
   info.js                    "$Type|Name" of a unit
   mirror-gaps.sh             documents the range changed that the YAML mirror cannot see
+  mirror-gaps.js             its census, upgrade detection and name resolution
   findwidget.js              locate a widget inside a page/snippet
   usages.js                  who references a document, from BSON (finds snippet placement)
   expand-pseudocode.js       split mxlint pseudocode into diffable .flow.txt

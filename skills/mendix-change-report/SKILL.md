@@ -65,11 +65,18 @@ worth raising, not something to silently include or exclude. "What I'm about to 
 ```bash
 bash "$MXDIFF/build-history.sh" '<oldest>^..<newest>'     # ~30s/commit, incremental
 bash "$MXDIFF/review.sh" '<oldest>..<newest>' --summary   # triage table
+bash "$MXDIFF/mirror-gaps.sh" <oldSha> <newSha>            # documents the mirror cannot see - read them too
 bash "$MXDIFF/invariants.sh" '<oldest>..<newest>'         # mechanical defect checks - run BEFORE reading
 bash "$MXDIFF/review.sh" '<oldest>..<newest>'             # full YAML property diffs
 bash "$MXDIFF/lint-diff.sh" <oldSha> <newSha>             # quality gate, changed docs only
 bash "$MXDIFF/mdl-diff.sh" <oldSha> <newSha> Module.SUB_Foo Module.ACT_Bar Module.SUB_Baz
 ```
+
+`mirror-gaps.sh` is not optional. mxlint skips marketplace modules on export, so a change to
+one - a layout above all - is in the commit and in no table, lint result or invariant check. Read
+each gap with `mdl-diff.sh <shaA> <shaB> <type>:<Module.Name>` and put it in the change list. A
+marketplace or platform upgrade is reported as one change with a count: review it as an upgrade,
+not document by document.
 
 **Subtract the export noise from the triage table before counting anything.** `+1/-1` rows whose
 only changed line is `pseudocode:`, every `.flow.txt`, and `R100 {X => X_TRUNCATED_<hash>_}` at

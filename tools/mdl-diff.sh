@@ -31,12 +31,24 @@ assert_project_free "$WT"
 mkdir -p "$OUT"
 MPR="$(basename "$(mpr_path "$REPO")")"
 
+# A document may be given as <type>:<Module.Name>. mxcli's auto-detect does not know
+# every type - layouts above all - and answers "no describable document named ..." for
+# them, which reads like "mxcli cannot describe this" when the type alone was missing.
+# A colon is not a legal filename character on Windows, so the cache name drops it.
+describe_one() { # describe_one <doc>
+  case "$1" in
+    *:*) mxcli describe -p "$WT/$MPR" "${1%%:*}" "${1#*:}" 2>/dev/null ;;
+    *)   mxcli describe -p "$WT/$MPR" "$1"       2>/dev/null ;;
+  esac
+}
+cache_name() { echo "${1//:/__}"; }
+
 render() { # render <sha> <suffix>
   local sha="$1" suffix="$2" doc
   git -C "$WT" checkout -q --detach "$sha" || die "checkout $sha failed"
   for doc in "${DOCS[@]}"; do
-    mxcli describe -p "$WT/$MPR" "$doc" 2>/dev/null \
-      | grep -vE '^[[:space:]]*@(position|anchor)\(' > "$OUT/$doc.$suffix.mdl"
+    describe_one "$doc" \
+      | grep -vE '^[[:space:]]*@(position|anchor)\(' > "$OUT/$(cache_name "$doc").$suffix.mdl"
   done
 }
 
@@ -44,18 +56,24 @@ render "$A" old
 render "$B" new
 
 for doc in "${DOCS[@]}"; do
+  c="$OUT/$(cache_name "$doc")"
   echo "############ $doc   ($A_REF -> $B_REF)"
-  if [ ! -s "$OUT/$doc.old.mdl" ] && [ ! -s "$OUT/$doc.new.mdl" ]; then
-    echo "(mxcli could not describe this document - use sweep.sh for ground truth)"
-  elif [ ! -s "$OUT/$doc.old.mdl" ]; then
-    echo "(new document - full definition)"; cat "$OUT/$doc.new.mdl"
-  elif [ ! -s "$OUT/$doc.new.mdl" ]; then
+  if [ ! -s "$c.old.mdl" ] && [ ! -s "$c.new.mdl" ]; then
+    case "$doc" in
+      *:*) echo "(mxcli could not describe this document - use sweep.sh for ground truth)" ;;
+      *)   echo "(mxcli could not describe this document. If it is a layout or another type"
+           echo " its auto-detect does not know, name the type: ${doc%%.*}-style '<type>:$doc'."
+           echo " Otherwise use sweep.sh for ground truth.)" ;;
+    esac
+  elif [ ! -s "$c.old.mdl" ]; then
+    echo "(new document - full definition)"; cat "$c.new.mdl"
+  elif [ ! -s "$c.new.mdl" ]; then
     echo "(document removed)"
-  elif cmp -s "$OUT/$doc.old.mdl" "$OUT/$doc.new.mdl"; then
+  elif cmp -s "$c.old.mdl" "$c.new.mdl"; then
     echo "(no logic change)"
   else
     git --no-pager diff --no-index --no-prefix -U4 \
-        "$OUT/$doc.old.mdl" "$OUT/$doc.new.mdl" 2>/dev/null | tail -n +5
+        "$c.old.mdl" "$c.new.mdl" 2>/dev/null | tail -n +5
   fi
   echo
 done
