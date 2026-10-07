@@ -1,11 +1,16 @@
 # mendix-change-toolkit
 
-Real diffs for Mendix projects, and four Claude skills built on them.
+Real diffs for Mendix projects, and eight Claude skills built on them — from triaging a story
+nobody has started to building one into the model.
 
 Mendix stores the whole model in binaries (`YourApp.mpr` + `mprcontents/**.mxunit`), so a
 commit shows up in git as `Bin 446464 -> 446464 bytes` and nothing else. This toolkit
-reconstructs genuine, readable, combinable diffs — for code review, test instructions, and
-customer/team change notes.
+reconstructs genuine, readable, combinable diffs, and the skills read them: code review, test
+instructions, customer/team change notes, story triage and implementation plans.
+
+**One skill writes.** `mendix-build` authors documents into the working copy — the thing every
+other skill here refuses to do. It still never commits, never pushes, never switches branch, and
+stops at every step only a person can take.
 
 Portable by design: copy this folder to any machine, install once, and it works against any
 Mendix project on that machine. Nothing is project-specific.
@@ -22,12 +27,28 @@ Mendix project on that machine. Nothing is project-specific.
 | **mxcli** | readable MDL logic, callers/impact | `mxcli --version` |
 | **mxlint** (**3.17+**) | YAML model export, `lint --diff` | `mxlint version` |
 
-Last verified against **mxcli v0.24.0** and **mxlint v3.18.0** on Mendix 11.12.4 (2026-10-02).
+Two more are needed only by the skills that touch a live project, and both come with Studio Pro
+rather than being installed:
+
+| Tool | Needed by | Note |
+|---|---|---|
+| **Studio Pro MCP server** | `mendix-build`, `explain-mendix-doc-complete` | the server *is* Studio Pro, so the project must be open; default `localhost:7782` |
+| **`mx.exe`** | `mendix-build` (Step 4b) | `C:Program FilesMendix<version>modelermx.exe` — the version must match the project |
+
+Last verified against **mxcli v0.24.0** and **mxlint v3.18.0** on Mendix 11.12.4, reading
+2026-10-02 and writing 2026-10-06.
 
 **[MODEL-READING.md](MODEL-READING.md) is the capability matrix** — mxcli vs mxlint vs the
 Studio Pro MCP vs raw BSON, measured on the same documents, with the sizes. Read it before
 deciding which tool answers a question; these tools' blind spots have moved between releases and
 two moved between mxcli v0.16 and v0.24.
+
+**[WRITING-TO-THE-MODEL.md](WRITING-TO-THE-MODEL.md) is the same thing for writes** — field notes
+from instrumented write runs, each dated: what the MCP and mxcli can each author, the steps that
+have no tool at all, the three validators and what each one cannot see. It grows a section per run
+and corrects itself where a later run disproves an earlier conclusion, so read the dates rather
+than assuming it settled. `mendix-build` reads it before it starts, and so should anyone trusting
+a claim about what an agent can author.
 
 The short version: **mxcli reads everything** and is the default. The **Studio Pro MCP** supplies
 one short list of flags mxcli cannot render at all (`commit`, `refreshInClient`,
@@ -100,26 +121,56 @@ up later updates.
 
 ## 3. The skills
 
-| Skill | Use it for |
-|---|---|
-| `mendix-review` | code review of a commit range |
-| `mendix-test-instructions` | executable test steps derived from the real diff |
-| `mendix-change-notes` | customer/team-facing release notes |
-| `mendix-change-report` | all three in one pass (collects once) |
+Three take a story from unread to built, each reading the previous one's report:
+
+| Skill | Use it for | Writes? |
+|---|---|---|
+| `mendix-scout` | is this story ready to pick up, and what has nobody answered | no |
+| `mendix-plan` | how to build it: which documents change, which get added, in what order | no |
+| `mendix-build` | **execute the plan against the model** | **yes** |
+
+Scout is cheap and deliberately shallow; plan is the deep pass and goes properly into the
+codebase. Neither decides anything — they report options and open questions for a developer.
+
+The other five start from a change that already exists, and read commits rather than a report:
+
+| Skill | Use it for | Writes? |
+|---|---|---|
+| `mendix-review` | code review of a commit range | no |
+| `mendix-test-instructions` | executable test steps derived from the real diff | no |
+| `mendix-change-notes` | customer/team-facing release notes | no |
+| `mendix-change-report` | review + tests + notes in one pass (collects once) | no |
+| `explain-mendix-doc-complete` | one document, at the highest fidelity available | no |
 
 Invoke by name (`/mendix-review`) or just describe the task — the descriptions are written to
 trigger on things like "review the last 5 commits", "how do we test this", "what do I tell
-the customer", "what am I about to pull".
+the customer", "what am I about to pull", "plan this story", "is this ready to pick up".
 
 Use `mendix-change-report` when more than one artifact is wanted: replaying commits is the
 expensive step and it happens once instead of three times.
+
+### mendix-build is the exception, and it is deliberate
+
+Every other skill is read-only by construction. `mendix-build` authors into the model, so it
+carries its own rules, and they are load-bearing rather than cautious:
+
+- **Working copy only.** Never commits, never pushes, never switches branch, never touches a
+  remote. A build leaves work for a person to review and commit.
+- **It stops rather than improvising.** The write loop cannot close without a person: saving an
+  MCP write, "Update security", closing Studio Pro before mxcli writes the `.mpr`, opening it
+  before the MCP answers, and running the app all have no tool at all. Measured over two write
+  runs — see §1 and §15 of [WRITING-TO-THE-MODEL.md](WRITING-TO-THE-MODEL.md).
+- **If the plan is wrong it says so and stops.** It executes a plan; it does not write one.
 
 ---
 
 ## 4. Using the tools directly
 
-Run from inside the Mendix project. Only read-only mxcli commands are used. **Studio Pro may stay
-open** — the scripts read a separate worktree copy, and they abort if that copy is ever locked.
+Run from inside the Mendix project. **These scripts are read-only** — only read-only mxcli verbs,
+and **Studio Pro may stay open**, because they read a separate worktree copy and abort if that copy
+is ever locked. (Writing is `mendix-build` alone, and it has the opposite requirement: mxcli
+cannot write the `.mpr` while Studio Pro holds it open. See
+[WRITING-TO-THE-MODEL.md](WRITING-TO-THE-MODEL.md).)
 
 ```bash
 MXDIFF=~/.claude/mxdiff
@@ -144,7 +195,15 @@ bash $MXDIFF/lint-diff.sh <baseSha> HEAD
 
 # raw BSON ground truth - no export, no worktree needed
 bash $MXDIFF/sweep.sh <baseSha> HEAD detail
+
+# mechanical checks over the range; emits CANDIDATES a reviewer must confirm
+bash $MXDIFF/invariants.sh <baseSha>..HEAD
 ```
+
+`invariants.sh` is the one tool here that does not describe a change — it looks for defect
+classes a manual review misses, each derived from one that got through. It needs the mirror, so
+run `build-history.sh` first, and it never produces findings: a reviewer opens the document and
+confirms before anything reaches a human.
 
 ### How it works
 
@@ -169,6 +228,8 @@ Delete it any time; it rebuilds.
 | Sources disagree / need certainty / flow edges? | `sweep.sh` |
 | Did the mirror miss anything this range changed? | `mirror-gaps.sh` |
 | Where is this document used — is this snippet placed? | `usages.js` |
+| Mechanical defect candidates over a range? | `invariants.sh` |
+| Does the whole project still check? | `mx.exe check` (ships with Studio Pro, §5) |
 
 ---
 
@@ -240,6 +301,7 @@ Found by testing, not assumed:
 ```
 install.sh / install.ps1     installers
 MODEL-READING.md             which reader gives which fact, measured; the MCP; safety rules
+WRITING-TO-THE-MODEL.md      what an agent can author, measured; the gates; the validators
 tools/
   lib.sh                     shared helpers, path + repo resolution
   doctor.sh                  dependency and project check
@@ -248,6 +310,8 @@ tools/
   mdl-diff.sh                readable before/after logic via mxcli MDL (<type>:<Module.Name> too)
   lint-diff.sh               mxlint over only the changed documents
   sweep.sh                   raw BSON ground-truth diff
+  invariants.sh              mechanical defect checks over a range (candidates, not findings)
+  invariants.js              the checks themselves, each named for the defect it came from
   mxunit.js                  BSON decoder for .mxunit files
   mxdiff.js                  structural diff, ID-aligned, noise-filtered
   info.js                    "$Type|Name" of a unit
@@ -256,12 +320,14 @@ tools/
   findwidget.js              locate a widget inside a page/snippet
   usages.js                  who references a document, from BSON (finds snippet placement)
   expand-pseudocode.js       split mxlint pseudocode into diffable .flow.txt
+  package.json               pins nothing; marks tools/ as CommonJS for node
 skills/
+  mendix-scout/                  is the story ready to pick up
+  mendix-plan/                   how to build it
+  mendix-build/                  build it — the only skill that writes
   mendix-review/
   mendix-test-instructions/
   mendix-change-notes/
   mendix-change-report/
-  mendix-scout/
-  mendix-plan/
   explain-mendix-doc-complete/   one document, read at the highest fidelity available
 ```

@@ -517,7 +517,7 @@ function secretSharedValues(files, changedSet) {
 }
 
 /* gate-constant-never-configured
- * Defect class: CLE-635 wrapped its whole calculation in
+ * Defect class: one real story wrapped its whole calculation in
  * @Finance.InvoiceRun_FractionRate, a Boolean defaulting to False that no
  * configuration sets - so the feature shipped inert in every environment. */
 function gateConstants(files) {

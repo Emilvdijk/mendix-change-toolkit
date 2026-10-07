@@ -242,7 +242,7 @@ So every skill that analyses a *range* works exactly as before, with no MCP step
 | `explain-mendix-doc-complete` | the current model | ✅ use it |
 
 A further trap: the working copy is **ahead of or behind** the commit you may be reasoning
-about. If the question is "what changed in CLE-711", the MCP's answer describes neither the
+about. If the question is "what changed in TICKET-711", the MCP's answer describes neither the
 before nor the after. Use it only for questions about the model as it stands right now.
 
 ---
