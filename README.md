@@ -109,7 +109,32 @@ Project-local instead of user-wide (`<repo>/.claude/`):
 bash install.sh --project
 ```
 
-Re-running is safe; it overwrites only its own files. To install elsewhere, set
+### Link instead of copy, if this checkout is where you edit
+
+```bash
+bash install.sh --link
+powershell -ExecutionPolicy Bypass -File install.ps1 -Link
+```
+
+This installs **symlinks** (junctions on Windows) rather than copies, making the checkout the
+single source of truth: edit a `SKILL.md` here and every agent picks it up immediately, with no
+reinstall.
+
+Use it if you also *develop* the toolkit. A copying install takes a snapshot, and the snapshot goes
+stale the moment you edit a skill — silently, because a stale skill still loads and still looks
+right. The failure is not an error message, it is an agent following last week's rules.
+
+Verified: Claude Code discovers skills through a junction exactly as through a real directory, so
+every agent that reads `~/.claude/skills` sees it — interactive sessions, headless `-p` runs, and
+agents spawned by another tool. Windows junctions need no administrator rights.
+
+Both modes refuse to overwrite the other: a copying install over an existing link would write
+*through* it, back into this repo, so it skips and says so instead.
+
+Plain `install.sh` (copies) remains right for anyone who just consumes the toolkit — a copy cannot
+break when the checkout moves.
+
+Re-running either mode is safe; it overwrites only its own files. To install elsewhere, set
 `MXDIFF_HOME` to wherever the `mxdiff` folder ended up.
 
 **Sharing with your team:** Each person clones it
