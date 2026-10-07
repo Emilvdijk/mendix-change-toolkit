@@ -226,6 +226,7 @@ Delete it any time; it rebuilds.
 | What does the logic now do differently? | `mdl-diff.sh` |
 | Does the change introduce quality/security issues? | `lint-diff.sh` |
 | Sources disagree / need certainty / flow edges? | `sweep.sh` |
+| Every place that deletes / commits / retrieves X? | `node actions.js --type Delete --match X` |
 | Did the mirror miss anything this range changed? | `mirror-gaps.sh` |
 | Where is this document used — is this snippet placed? | `usages.js` |
 | Mechanical defect candidates over a range? | `invariants.sh` |
@@ -270,6 +271,13 @@ Found by testing, not assumed:
   a layout reports `(no references found)` from both — measured on v0.24.0, two snippets, both
   placed. Microflow calls and widget actions ARE indexed, which is what makes the silence
   convincing. `usages.js` reads the BSON and finds it.
+- **`mxcli`'s `CATALOG.ACTIVITIES` omits activities inside loops** (v0.24.0). A loop or while
+  body is invisible to it: a catalog sweep for `DeleteObjectAction` found 150 deletes where the
+  BSON holds 160, and the 10 it missed, all in loop bodies, included the delete that was the bug.
+  `actions.js` answers any "every place that does X" question from the BSON and reports loop
+  depth.
+- **`mxcli describe microflow X` returns "not found" for a nanoflow.** Use
+  `describe nanoflow X`; a sweep that only describes microflows silently skips every nanoflow.
 - **`mxcli refs` does not index user-role membership either.** `refs <Module>.<Role>` answers
   `(no references found)` while project user roles still hold that module role — measured after a
   module delete, where two of them did. Deleting a module does NOT clean the user roles up, and
@@ -284,11 +292,11 @@ Found by testing, not assumed:
   navigation are expected to be covered for the same reason and have not been proven here.
   Run it on a copy, or with Studio Pro closed, and match the version to the project.
 - **mxlint truncates long filenames** on export —
-  `SUB_Invoice_SendSingl_TRUNCATED_46aa2_icroflow.yaml`. A document with a long name cannot be
+  `SUB_Invoice_SendRemi_TRUNCATED_46aa2_icroflow.yaml`. A document with a long name cannot be
   found by filename; grep the contents or use the generated `app.yaml` path map. Pages are
   written as `Forms$Page.yaml`, not `Pages$Page.yaml`.
 - **mxlint's page export is enormous** — 7.4 MB of YAML for one page
-  (`Scheduling.Planning_Overview`), against 90 KB from `mxcli describe page`. Fine for diffing,
+  (`Scheduling.Board_Overview`), against 90 KB from `mxcli describe page`. Fine for diffing,
   unusable for reading.
 - **The Studio Pro MCP is not a page reader.** `pg_read_page` returns 211 bytes with every widget
   list elided to `"..."`, and its `depth` argument only truncates further. It expands one level
@@ -319,6 +327,7 @@ tools/
   mirror-gaps.js             its census, upgrade detection and name resolution
   findwidget.js              locate a widget inside a page/snippet
   usages.js                  who references a document, from BSON (finds snippet placement)
+  actions.js                 every activity of one action type (delete/commit/...), loops included
   expand-pseudocode.js       split mxlint pseudocode into diffable .flow.txt
   package.json               pins nothing; marks tools/ as CommonJS for node
 skills/

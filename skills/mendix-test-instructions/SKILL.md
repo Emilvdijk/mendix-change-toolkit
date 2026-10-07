@@ -28,7 +28,7 @@ cd mendix-change-toolkit && bash install.sh   # Windows: install.ps1 via PowerSh
 ```
 
 That installs to `~/.claude/mxdiff/` and applies to every project on the machine. The repo is
-private: if the clone fails with a permission error, the user needs to be granted access to it.
+public, so no access needs to be granted.
 
 **Never fall back to `git diff`, `git show`, or reading the `.mpr` directly.** Mendix stores its
 model in binaries; any "diff" produced that way is meaningless or invented — and test steps
@@ -87,6 +87,11 @@ button, or scheduled/after-startup event — that is the start of the test. If a
 sub-microflow is called from several places, **each caller is a separate test case**, because
 the surrounding state differs and the callers often differ from each other (one may filter its
 input while another does not).
+
+For regression scope ("what else deletes or commits this entity?"), do not use mxcli's
+`CATALOG.ACTIVITIES`: it omits activities inside loops. Use
+`node "$MXDIFF/actions.js" --type Delete --match EntityName` instead. It reads the BSON and
+reports loop depth.
 
 For changed pages/snippets, get the widget's label, bound attribute and containing tab:
 

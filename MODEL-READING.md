@@ -19,7 +19,7 @@ gaps have moved before, and two of them moved between v0.16 and v0.24.
 
 > **Document and module names below are renamed.** The measurements, sizes, counts and tool
 > output are verbatim from a real project; only the nouns have been moved, so `Sales.Invoice` and
-> `Scheduling.Planning_Overview` are not real documents. Shapes and numbers are real.
+> `Scheduling.Board_Overview` are not real documents. Shapes and numbers are real.
 
 ---
 
@@ -55,13 +55,13 @@ gaps have moved before, and two of them moved between v0.16 and v0.24.
 
 ### Measured sizes, same document, one call each
 
-**Microflow** `Project.SUB_Invoice_SendSingleReminder`:
+**Microflow** `Billing.SUB_Invoice_SendReminder`:
 
 | mxcli `describe` | mxlint YAML | MCP root read |
 |---|---|---|
 | **6,551 B — complete** | 16,955 B — complete, after an 18.5 s export | 1,705 B — **28 empty stubs, zero activities** |
 
-**Page** `Scheduling.Planning_Overview`:
+**Page** `Scheduling.Board_Overview`:
 
 | mxcli `describe page` | mxlint YAML | MCP `pg_read_page` |
 |---|---|---|
@@ -279,7 +279,7 @@ Still true, re-confirmed on v0.24:
 New, not previously recorded:
 
 - **mxlint truncates long filenames** in its export —
-  `SUB_Invoice_SendSingl_TRUNCATED_46aa2_icroflow.yaml`. You cannot locate a document by filename
+  `SUB_Invoice_SendRemi_TRUNCATED_46aa2_icroflow.yaml`. You cannot locate a document by filename
   when its name is long; grep the contents, or use the generated `app.yaml` path map.
 - **No layouts reach the mirror in the app measured.** Layouts live in marketplace modules
   almost by default: one app owns 33 layouts and not one of them sits in its own module, so

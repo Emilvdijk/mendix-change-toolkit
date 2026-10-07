@@ -114,7 +114,7 @@ every path you need into the second — never one call per activity. Read only t
 whatever the question is about.
 
 This is the step that changes conclusions. On
-`Project.SUB_Invoice_SendSingleReminder`, mxcli renders:
+`Billing.SUB_Invoice_SendReminder`, mxcli renders:
 
 ```
 change $Invoice (SendAt = [%CurrentDateTime%], CountSentEmails = ... + 1);
@@ -132,7 +132,7 @@ mxlint export    # point modelsource at a scratch dir via --config; do not let i
 ```
 
 Then read `modelsource/<Module>/.../<Doc>.<Package>$<DocType>.yaml`. Two traps: long filenames
-are **truncated** (`SUB_Invoice_SendSingl_TRUNCATED_46aa2_icroflow.yaml`), so grep the contents
+are **truncated** (`SUB_Invoice_SendRemi_TRUNCATED_46aa2_icroflow.yaml`), so grep the contents
 rather than looking for the name; and pages are named `Forms$Page.yaml`, not `Pages$Page.yaml`.
 
 If mxlint and mxcli genuinely disagree on a fact — a conflicting claim, not just verbosity —

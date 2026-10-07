@@ -32,7 +32,7 @@ cd mendix-change-toolkit && bash install.sh   # Windows: install.ps1 via PowerSh
 ```
 
 That installs to `~/.claude/mxdiff/` and applies to every project on the machine. The repo is
-private: if the clone fails with a permission error, the user needs to be granted access to it.
+public, so no access needs to be granted.
 
 `doctor.sh` also flags two project-level things worth fixing before you start: `.mendix-cache`
 not being git-ignored (add `/.mendix-cache/`), and a missing `mprcontents/` (pre-Mendix 10.18,
@@ -113,6 +113,14 @@ Ground truth when sources disagree, or for flow edges / `RefreshInClient`:
 
 ```bash
 bash "$MXDIFF/sweep.sh" <oldSha> <newSha> detail
+```
+
+To find every place that deletes, commits or retrieves an entity, use `actions.js`, not mxcli's
+`CATALOG.ACTIVITIES`. The catalog omits activities inside loop and while bodies, and
+`describe microflow` returns "not found" for nanoflows:
+
+```bash
+node "$MXDIFF/actions.js" --type Delete --match EntityName   # bare name: delete actions only carry a variable name
 ```
 
 Tool division: YAML gives properties, security and commit flags; MDL gives readable logic; BSON
@@ -199,7 +207,7 @@ Defects introduced and fixed within the range are not release notes.
   every behaviour-bearing document not opened. "Read it, it was fine" and "never opened it" look
   identical to a reader otherwise, and the second is what lets a bug reach a tester.
 - **One row per document in any changed-document table.** Collapsing a module into
-  `BackgroundTask (new module) | 16 microflows, 4 enums` reads as coverage while being a list of
+  `SyncJobs (new module) | 16 microflows, 4 enums` reads as coverage while being a list of
   things nobody looked at. A whole new module deserves its own pass — say so rather than folding
   it into a wider range.
 

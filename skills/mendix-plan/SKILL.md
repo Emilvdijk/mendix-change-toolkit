@@ -144,7 +144,7 @@ Work outwards from the most specific match, and establish for each candidate:
 - **Who calls it?** A change to a shared sub-microflow is a different proposition from a leaf.
   Name the callers that would need re-testing.
 - **Is there a family?** If the story names one of several parallel constructs (`ADO_*`,
-  `SUB_*_SyncWithServiceTab`, one of six validation flows), read the siblings. **Half-built
+  `SUB_*_SyncWithExternalApi`, one of six validation flows), read the siblings. **Half-built
   features come from changing one member of a family** — and the story usually names only the
   half its author noticed. Say explicitly which siblings should change together.
 
@@ -176,7 +176,7 @@ Two things to know before you trust it:
   the most expensive read in this skill. Run it once, early, and reuse the output; never per
   candidate document.
 - **The dead-documents list is dominated by marketplace modules.** Measured, the top entries were
-  all `BZToaster`, `CommunityCommons` and `ExactOnline` entities — unreferenced because the app
+  all `CommunityCommons` and other Marketplace-module entities — unreferenced because the app
   uses part of a library, which is normal and not a finding. Framework modules are excluded by
   default; add `--exclude` for the marketplace modules in this app, or read only the rows in
   modules the team actually writes.
@@ -203,7 +203,7 @@ Confirm with `list_modules` that the open project is the right one — the MCP r
 Studio Pro has open**, never a commit, and says nothing if that is a different project.
 
 **For page structure use `mxcli describe page`, not the MCP.** Measured on
-`Scheduling.Planning_Overview`: mxcli returns the real 90 KB widget tree in one call, `pg_read_page`
+a large overview page: mxcli returns the real 90 KB widget tree in one call, `pg_read_page`
 returns 211 bytes with every widget list elided to `"..."`. Entity access rules likewise come
 from `mxcli describe entity`, complete with the XPath on each grant.
 

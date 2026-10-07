@@ -25,7 +25,7 @@ cd mendix-change-toolkit && bash install.sh   # Windows: install.ps1 via PowerSh
 ```
 
 That installs to `~/.claude/mxdiff/` and applies to every project on the machine. The repo is
-private: if the clone fails with a permission error, the user needs to be granted access to it.
+public, so no access needs to be granted.
 
 **Never write change notes from commit messages alone**, and never fall back to `git diff` /
 `git show` / reading the `.mpr` — Mendix stores its model in binaries, so any diff produced that
@@ -99,7 +99,7 @@ This is the part that gets missed and the part that causes incidents.
 
 - **Data impact.** If a bug destroyed or corrupted data before the fix, existing records are
   still affected — the fix is not retroactive. Say so and say what the recovery action is
-  ("these work orders must be re-signed"). Derive it from the *old* behaviour in the MDL diff.
+  ("these orders must be re-approved"). Derive it from the *old* behaviour in the MDL diff.
 - **No back-fill.** New integrations and new fields apply only to records created or processed
   after the release. Existing records are not sent or populated retroactively. State it
   explicitly; users assume otherwise.

@@ -29,7 +29,7 @@ cd mendix-change-toolkit && bash install.sh   # Windows: install.ps1 via PowerSh
 ```
 
 That installs to `~/.claude/mxdiff/` and applies to every project on the machine. The repo is
-private: if the clone fails with a permission error, the user needs to be granted access to it.
+public, so no access needs to be granted.
 
 **Never fall back to `git diff`, `git show`, or reading the `.mpr` directly.** Mendix stores its
 model in binaries; any "diff" produced that way is meaningless or invented. No toolkit, no
@@ -248,6 +248,15 @@ Raw `.mxunit` BSON. Authoritative, and the **only** source for sequence-flow edg
 `RefreshInClient` on delete actions. A document listed with `0 change(s)` was re-saved but is
 semantically identical — say so rather than reporting it.
 
+**"Where else does this happen?"** When a finding depends on every place that deletes, commits
+or retrieves an entity, do not sweep with mxcli's `CATALOG.ACTIVITIES`: it omits every activity
+inside a loop or while body. Do not loop `describe microflow` either: it returns "not found"
+for nanoflows. Read the BSON instead (run it from the project root; it reads `.mxunit` only):
+
+```bash
+node "$MXDIFF/actions.js" --type Delete --match EntityName    # also Commit, Retrieve, Change...
+```
+
 **The Studio Pro MCP cannot help with a review.** It reads whatever project Studio Pro has open
 right now — the working copy — so it cannot see either side of a commit range. Do not reach for
 it here; `sweep.sh` and the YAML mirror are the only ground truth for historical state. (It is
@@ -379,7 +388,7 @@ say so in that line — "plus 236 documents rewritten by a platform upgrade, rev
 upgrade" is honest; leaving them out of the count is not.
 
 **One row per document in the changed-document table.** Never collapse several documents into a
-single row — `BackgroundTask (new module) | 16 microflows, 2 nanoflows, 4 enums` reads as
+single row — `SyncJobs (new module) | 16 microflows, 2 nanoflows, 4 enums` reads as
 coverage while actually being the list of things nobody looked at. If the table gets long, group
 by module with the documents still individually listed.
 

@@ -73,10 +73,9 @@ const isFlow = (p) => /\$(Microflow|Nanoflow)\.yaml$/.test(p);
 // ================================================================
 
 /* enum-guard-mismatch
- * Defect class: ACT_BackgroundTask_SyncAllProjects wrote
- * BackgroundTaskType = CustomerSync while both of its own guards filtered on
- * ProjectSync, so the dedupe never matched and the task was dispatched to the
- * wrong handler. A document that writes one value of an attribute and tests a
+ * Defect class: a sync action wrote TaskType = CustomerSync while both of its
+ * own guards filtered on ProjectSync, so the dedupe never matched and the task
+ * was dispatched to the wrong handler. A document that writes one value of an attribute and tests a
  * disjoint set of values of that same attribute is almost always a copy-paste
  * slip. */
 function enumGuardMismatch(file, text) {
@@ -140,9 +139,9 @@ function enumGuardMismatch(file, text) {
  * a small number of value lines reference a rival family, those lines are worth
  * a look. */
 // No trailing \b: Mendix identifiers are compounds (CustomerSync, ProjectSync,
-// BackgroundTask_Relation) and a trailing boundary would never match them.
-// "Object" is deliberately absent: it is ServiceTab's word for a project but it
-// also appears in Mendix built-ins (ObjectKey, ObjectMappingElement) often
+// Task_Relation) and a trailing boundary would never match them.
+// "Object" is deliberately absent: some external APIs use it for a project, but
+// it also appears in Mendix built-ins (ObjectKey, ObjectMappingElement) often
 // enough to drown the signal.
 const FAMILIES = {
   relation: /(Relation|Customer|Client)/,
@@ -178,9 +177,8 @@ function pairSkew(file, text) {
 }
 
 /* retrieve-nondeterministic
- * Defect class: SUB_Employee_SynchWithServiceTab retrieved a single WorkPermit
- * document with no sort order, so an employee holding a renewal got an
- * arbitrary one of the two. */
+ * Defect class: an employee sync retrieved a single permit document with no
+ * sort order, so an employee holding a renewal got an arbitrary one of the two. */
 function retrieveNondeterministic(file, text) {
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
@@ -204,8 +202,8 @@ function retrieveNondeterministic(file, text) {
 }
 
 /* unused-result
- * Defect class: ASU_Main captures the boolean returned by
- * ASU_Relation_SetExternalId and never tests it. Also catches a list operation
+ * Defect class: an after-startup flow captures the boolean returned by a
+ * sub-microflow and never tests it. Also catches a list operation
  * or aggregate whose result is computed and thrown away. */
 function unusedResult(file, text) {
   const lines = text.split(/\r?\n/);
@@ -230,7 +228,7 @@ function unusedResult(file, text) {
 }
 
 /* guard-already-enforced
- * Defect class: ACT_BackgroundTask_SyncAllRelations retrieved its source list
+ * Defect class: a bulk sync action retrieved its source list
  * with [not(Assoc/Entity[X][Y])], then inside the loop retrieved that same
  * Entity[X][Y] again and skipped rows where a Find over Assoc hit. The XPath had
  * already excluded every such row, so the skip branch was unreachable and the
@@ -293,9 +291,9 @@ function guardAlreadyEnforced(file, text) {
 }
 
 /* date-format-guard-inconsistent
- * Defect class: SUB_Employee_SynchWithServiceTab guards the employee birthday
- * with "if ... != empty then formatDateTimeUTC(...)" but formats the document
- * ExpiryDate with no guard at all, in the same flow.
+ * Defect class: a sync flow guards one date with
+ * "if ... != empty then formatDateTimeUTC(...)" but formats another date with
+ * no guard at all, in the same flow.
  *
  * Reported only when a document does both, so this is an internal-consistency
  * check rather than a claim about how Mendix handles an empty date - which
@@ -332,12 +330,10 @@ function dateFormatGuardInconsistent(file, text) {
 }
 
 /* cleared-association-consumed
- * Defect class: ACT_BackgroundTask_SyncAllProjects created a task with
- * BackgroundTask_Relation explicitly set to empty and BackgroundTaskType set to
- * CustomerSync. The dispatcher routes CustomerSync to
- * SUB_Relation_SyncWithServiceTab, whose first act is to retrieve over
- * BackgroundTask_Relation - the association the creator just cleared. Project
- * sync therefore never ran.
+ * Defect class: a sync action created a task with Task_Relation explicitly set
+ * to empty and TaskType set to CustomerSync. The dispatcher routes CustomerSync
+ * to the customer sync flow, whose first act is to retrieve over Task_Relation -
+ * the association the creator just cleared. The sync therefore never ran.
  *
  * Needs three documents to see it, which is exactly why a per-document read
  * misses it. The dispatch table comes from the rendered pseudocode block.
@@ -439,9 +435,9 @@ function clearedAssociationConsumed(scopeFiles, index) {
 // ================================================================
 
 /* anonymous-grant
- * Defect class: EmployeeDocumentComplianceView granted Resource.Anonymous read
- * on employee names and their missing immigration documents, on a project with
- * EnableGuestAccess: true. */
+ * Defect class: a compliance view entity granted an Anonymous module role read
+ * access to employee names and their missing personal documents, on a project
+ * with EnableGuestAccess: true. */
 function anonRoles(file) {
   const lines = read(file).split(/\r?\n/);
   const out = new Map();
@@ -481,7 +477,7 @@ function anonymousGrants(files, changedSet) {
 }
 
 /* secret-shared-value
- * Defect class: the live ServiceTab API key committed as a Settings$SharedValue
+ * Defect class: a live third-party API key committed as a Settings$SharedValue
  * in one configuration while other configurations correctly used PrivateValue.
  * SharedValue is stored in the .mpr and therefore in git forever. */
 function secretSharedValues(files, changedSet) {
@@ -518,7 +514,7 @@ function secretSharedValues(files, changedSet) {
 
 /* gate-constant-never-configured
  * Defect class: one real story wrapped its whole calculation in
- * @Finance.InvoiceRun_FractionRate, a Boolean defaulting to False that no
+ * a Boolean constant defaulting to False that no
  * configuration sets - so the feature shipped inert in every environment. */
 function gateConstants(files) {
   const settings = files.find((f) => /Settings\$ProjectSettings\.yaml$/.test(f));
@@ -565,8 +561,8 @@ function gateConstants(files) {
 // ================================================================
 
 /* persistent-data-removed
- * Defect class: Resource.EmployeeDetails (persistable) deleted outright and
- * Relation.ExternalID dropped from a persistable entity. Both are irreversible
+ * Defect class: a persistable entity deleted outright and an external-id
+ * attribute dropped from another persistable entity. Both are irreversible
  * on deploy and neither is obvious from a diff stat. */
 function parseEntities(file) {
   const lines = read(file).split(/\r?\n/);
