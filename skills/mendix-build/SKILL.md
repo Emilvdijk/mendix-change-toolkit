@@ -202,6 +202,25 @@ Then `grep -r '<ModuleName>\.' mprcontents/` for anything else still pointing at
 At every gate: **say precisely what you need, and what you will do next.** "Close Studio Pro and
 tell me" is actionable. "Studio Pro must be closed" is not.
 
+**Opening and closing Studio Pro may be delegated to you — but only if the session that started you
+says so.** Nothing in this skill grants it. If your brief does, use the script and nothing else:
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File "$MXDIFF_HOME/studiopro.ps1" \
+  status|open|close "<path to the .mpr>"
+```
+
+It resolves the process from that project's own `<App>.mpr.lock`, so it acts on the one instance
+holding this project. **Never `taskkill`, never `Stop-Process`, and never pick a window by title** —
+two Studio Pros on two copies of the same app have the identical title, so a title match will
+eventually close someone's unsaved work (§27 of `WRITING-TO-THE-MODEL.md`).
+
+Exit 0 is success. **Exit 2 means it did not close, which is a dialog waiting for a person — say so
+and stop; do not force it.** Exit 3 is a stale lock, which is also theirs to judge. An open takes
+about 20 seconds and a close about 2, so check `status` afterwards rather than assuming.
+
+If your brief does not grant it, ask in one line and wait, exactly as for the gates above.
+
 **Reopening Studio Pro after an mxcli leg is NOT a gate. Do not ask for a save, and do not
 pre-announce one.** mxcli writes the `.mpr` on disk while Studio Pro is closed, so by the time it
 reopens the change is already saved — the editor is reading your write, not holding it. There is

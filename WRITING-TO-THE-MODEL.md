@@ -839,6 +839,60 @@ the syntax help and the rewrite changes the shape of the microflow.
   differently-named attribute. The mapping is correct and the names simply do not match the
   sample — expect it rather than treating it as a fault.
 
+## 27. Studio Pro can be opened and closed from a script, and the lock file is how
+
+The open/close dance (§18) is mechanics, not judgement, and it was the gate that interrupted the
+developer most. All of it can be automated. Measured 2026-10-07 on 11.12.4.
+
+**Opening** goes through the registered handler rather than `studiopro.exe`, because the Version
+Selector picks the Studio Pro matching the project's own version — and several live side by side:
+
+```
+HKLM:\SOFTWARE\Classes\.mpr -> "Mendix Version Selector.mpr"
+  shell\open\command = "...\Version Selector\VersionSelector.exe" "/file:%1"
+```
+
+`studiopro.exe` itself takes no useful switches — it is a 752 KB launcher, and neither it nor the
+35 `Mendix.Modeler*.dll` files contain a command-line option table.
+
+**Which process holds which project** is in `<App>.mpr.lock`, written next to the `.mpr`:
+
+```json
+{"SessionId":"57fd8ae1-71ec-4be9-854c-9b119de4db15","ProcessId":4680}
+```
+
+**This file is the only safe way to identify the instance.** Two Studio Pros open on two copies of
+the same app show the **identical** window title — `App (Main line ('main'), Git)` — so anything
+that picks a process by title, or by "the studiopro.exe that is running", will eventually close
+someone's unsaved work. Check that the named PID is alive *and* is actually a `studiopro`, or PID
+reuse will point you at an unrelated process.
+
+**Closing gracefully** is `CloseMainWindow()` — the WM_CLOSE that clicking X sends. Measured: the
+process exits in **1.5–2.1s** and Studio Pro removes its own lock file on the way out. Never
+`Kill`/`taskkill`: that skips the shutdown work and leaves the lock behind naming a dead PID, which
+is exactly the signature of a crash.
+
+So the three states read cleanly:
+
+| Lock file | PID alive and is studiopro | Means |
+|---|---|---|
+| absent | — | closed, and it shut down cleanly |
+| present | yes | open, that PID holds it |
+| present | no | **stale** — killed or crashed, shutdown work did not run |
+
+### Two traps
+
+- **The lock file is not a "project loaded" signal.** A project that failed to load (`This project
+  has been incorrectly initialized for Git`) still produced a lock file, and left Studio Pro sitting
+  on an empty window. Readiness is a main window whose title is something other than the bare
+  `Mendix Studio Pro`. A cold start measured **16–18s** to that point.
+- **A close that does not complete is a dialog**, almost always unsaved changes or a confirmation.
+  Wait, then say so. Do not escalate to a kill: the whole reason to close gracefully is the shutdown
+  work, and forcing it discards exactly that.
+
+`tools/studiopro.ps1` in this toolkit implements the above — `status`, `open`, `close` against one
+`.mpr` — and exits 0 on success, 2 when something is waiting for a person, 3 on a stale lock.
+
 ## Status of this run — complete
 
 **The app runs without error and the widget works.** Nine model documents plus the stylesheet:
