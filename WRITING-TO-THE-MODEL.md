@@ -1,9 +1,11 @@
 # Writing to a Mendix model from an agent — what actually happens
 
-Field notes from two instrumented write runs against scratch apps, Mendix 11.12.4, Studio Pro MCP
-server on `localhost:7782`, mxcli v0.24.0: a weather widget built from nothing (§1–18, 2026-10-02/03)
-and a starter-module removal (§19–23, 2026-10-06). The second run is the less interesting change and
-it corrected one of the first run's conclusions — see §19.
+Field notes from three instrumented write runs against scratch apps, Mendix 11.12.4, Studio Pro MCP
+server on `localhost:7782`, mxcli v0.24.0: a weather widget built from nothing (§1–18, 2026-10-02/03),
+a starter-module removal (§19–23, 2026-10-06) and a REST integration of 16 documents (§24–26,
+2026-10-07). The second run corrected one of the first run's conclusions — see §19. The third is the
+only one that produced a project no tool could open, and it did so from a script that passed the
+dry run — see §24.
 
 Everything here was measured during the run. Where a published capability list disagrees with
 what the server did, the server wins and the disagreement is recorded.
@@ -769,6 +771,73 @@ module also removes `themesource/<module>/` and creates `themesource/<new module
 part of the change.
 
 ---
+
+## 24. `mxcli check` passed a script that made the project unloadable
+
+The worst failure of the three runs, and the dry run said it was fine.
+
+A `CHANGE` on a **loop variable** stores its attributes unqualified. mxcli does not resolve the
+entity of a variable bound by `LOOP … IN`, so it writes the bare attribute name where the `.mpr`
+format requires a full `AttributeIdentifier`. The written file is not a valid project:
+
+```
+ERROR: Mendix.Modeler.Storage.StorageLoadException: One or more invalid values were detected
+while loading the project: Mendix.Modeler.Projects.Project:
+ - Change in  has an invalid value '' for property Attribute.
+   The text 'SortIndex' is not a valid AttributeIdentifier.
+```
+
+Four attributes, four identical errors. Not a validation error — a **load** error. Studio Pro
+cannot open the project, mxcli cannot read it back, and `ped_check_errors` cannot run at all,
+because there is nothing to run it against.
+
+The MDL that did it, reduced to the smallest reproducing case:
+
+```sql
+RETRIEVE $Questions FROM $Response/<Module>.<Entity>_<Other>;
+LOOP $Question IN $Questions BEGIN
+  CHANGE $Question (SortIndex = 1);        -- unqualified: breaks the project
+END LOOP;
+```
+
+```sql
+CHANGE $Question (<Module>.<Entity>.SortIndex = 1);   -- qualified: loads fine
+```
+
+What makes this expensive:
+
+- **`mxcli check` passed it**, reporting syntax OK and all references valid, on both the real
+  script and a reduced probe. The dry run is the one gate that is supposed to catch a malformed
+  write before it lands, and here it endorsed one.
+- **The association member in the same `CHANGE` was fine.** `<Module>.<Entity>_<Other> = $Session`
+  was already written qualified, so the statement looks half-correct in the source and gives no
+  visual cue. Only the bare attribute names break.
+- **Nothing downstream can tell you either**, because every reader needs to load the project first.
+  The only thing that reported it was `mx.exe check` (§19) — which is the strongest argument for
+  running it that these runs have produced.
+
+**The rule this buys:** qualify every attribute in a `CHANGE` on a loop variable, always, even
+though the unqualified form is accepted everywhere else. And when a script contains one, **apply it
+to a scratch copy and check that copy before touching the project.** That costs one copy and one
+`mx.exe check`; the alternative is a project that will not open and a bisect to find out why.
+
+## 25. `FIND` cannot reference another variable
+
+`FIND($List, SortIndex = $Index)` is refused with `MDL-LISTOP01`: the predicate may compare an
+item's member against a literal, not against a variable from the surrounding flow. The documented
+workaround in the error text is a lookup by key; where that does not fit, sort the list, take a
+range and head it.
+
+Worth knowing before planning a step around `FIND`, because the restriction is not obvious from
+the syntax help and the rewrite changes the shape of the microflow.
+
+## 26. Two MDL naming collisions
+
+- **`Value` is a keyword.** An attribute named `Value` is refused; the run used `AnswerText`.
+- **`type` arrives renamed.** Generating a JSON structure from a sample containing a `type`
+  element produces an element called `_type`, renamed by mxcli itself, which then maps to a
+  differently-named attribute. The mapping is correct and the names simply do not match the
+  sample — expect it rather than treating it as a fault.
 
 ## Status of this run — complete
 

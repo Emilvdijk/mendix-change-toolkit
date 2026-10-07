@@ -78,7 +78,8 @@ Measured routing on Mendix 11.12.4 — **re-check, do not memorise**:
 | Remove a module | **a person** in Studio Pro — and see Step 3f, it leaves the user roles behind |
 | Anything in a `writable: false` module | **a person** |
 | CSS / theme files | plain file write |
-| `ped_check_errors`, Update security, save | MCP / a person |
+| `ped_check_errors` | MCP — needs Studio Pro open |
+| Update security, save | **a person, and only after an MCP write** — see Step 4; an mxcli write is already on disk |
 
 **Say the routing out loud in your report before you start.** A step routed to a person is not a
 failure; discovering it at the end is.
@@ -110,6 +111,28 @@ One command. In the reference run, three widget expressions reached the model as
 instead of `not($currentObject/IsMinimized)` because the generating script ate the `$`. `mxcli
 check` passed them, the MCP cannot read snippets, and a person found them in the IDE.
 
+**Then grep for the one that breaks the project outright: an unqualified attribute in a `CHANGE`
+on a loop variable.**
+
+```bash
+grep -nA8 'LOOP $' <file>
+```
+
+mxcli does not resolve the entity of a variable bound by `LOOP … IN`, so it writes the bare
+attribute name where the `.mpr` needs a full identifier, and the saved project **will not load** —
+not a validation error, a `StorageLoadException`. `mxcli check` passes it, and once it is applied
+nothing can read the project back to tell you why.
+
+```sql
+LOOP $Question IN $Questions BEGIN
+  CHANGE $Question (SortIndex = 1);                      -- breaks the project
+  CHANGE $Question (<Module>.<Entity>.SortIndex = 1);    -- correct
+END LOOP;
+```
+
+An association member in the same `CHANGE` is written qualified already, so the statement looks
+half-right and gives no visual cue. Qualify **every** attribute inside a loop `CHANGE`.
+
 **3c. Dry run.**
 
 ```bash
@@ -120,6 +143,11 @@ This is the single biggest safety feature in the toolchain and the MCP has no eq
 caught a write that **crashes Studio Pro** (`MDL-WIDGET04`, an unbound template placeholder) and a
 property name that would have been *silently dropped on write*. Iterate here until clean — it costs
 nothing and nothing has been written yet.
+
+**It is not sufficient.** It also passed the loop-`CHANGE` above, which left the project
+unloadable. **If a script contains a `CHANGE` on a loop variable, or any statement shape you have
+not written before, apply it to a scratch copy and run `mx.exe check` on that copy first.** That
+costs one copy and one check; the alternative is a project nobody can open.
 
 For an MCP write there is no dry run, so re-read the schema instead and build the call carefully.
 
@@ -166,13 +194,33 @@ Then `grep -r '<ModuleName>\.' mprcontents/` for anything else still pointing at
 |---|---|---|
 | mxcli needs Studio Pro **closed** | writing the `.mpr` under an open IDE can corrupt it | stop, ask, continue when told |
 | MCP needs Studio Pro **open** | the server *is* Studio Pro | stop, ask, continue when told |
-| "Update security" after an access-rule change | no tool exposes that button | stop, ask |
-| Saving an MCP write | no save tool exists in the 18 | stop, ask |
+| Saving an **MCP** write | no save tool exists in the 18 | stop, ask |
+| "Update security" **when Studio Pro shows the prompt** | no tool exposes that button | stop, ask |
 | A layout rename, a layout-grid column, or any `writable: false` module | no tool can author it | leave it to the developer, say exactly what to do |
 | Running the app | no tool here does it | leave it to the developer |
 
 At every gate: **say precisely what you need, and what you will do next.** "Close Studio Pro and
 tell me" is actionable. "Studio Pro must be closed" is not.
+
+**Reopening Studio Pro after an mxcli leg is NOT a gate. Do not ask for a save, and do not
+pre-announce one.** mxcli writes the `.mpr` on disk while Studio Pro is closed, so by the time it
+reopens the change is already saved — the editor is reading your write, not holding it. There is
+nothing in memory to flush and Ctrl+S has nothing to do.
+
+The save gate above is for **MCP** writes only, and the distinction is the whole point: the MCP
+server *is* the running Studio Pro, so an MCP write lives in the IDE's memory until a person saves
+it. An mxcli write never goes near that memory. A build that applies the same gate to both sends
+the developer to press Ctrl+S on a file that is already on disk.
+
+Measured: a build wrote 16 documents with mxcli, then asked for "Update security" and a save on
+reopen. The developer answered *"opened, no errors, saved (nothing needs saving after the writes
+you did)"* — no prompt had appeared, and the app then ran correctly with the entity access mxcli
+had written, so those grants were live without the button. Ask about "Update security" **only if
+the developer tells you Studio Pro is showing it.** Announcing it in advance teaches them to
+ignore your gates, which costs you the ones that are real.
+
+What reopening Studio Pro IS for, after an mxcli leg: running `ped_check_errors` on the documents
+you touched, and reading the error list. Ask for the open, not for the save.
 
 **Verify a gate the developer says they completed — do not take it on trust, and do not take a
 tool's silence for it either.** Placement is the case that bites: after someone places a snippet
@@ -211,9 +259,37 @@ Measured on the reference run: the MCP reported `No errors found` across **50 do
 page, microflow and nanoflow in the app plus six domain models — and `mx.exe check` then found an
 error at `Security`, which is not a document the MCP can see.
 
-- **Run it on a copy** (`.mendix-cache/dash-scratch/mxcheck-copy`), or with Studio Pro closed. It
-  loads the `.mpr` and the IDE holds a lock. Expect a file in that copy to stay locked afterwards;
-  the folder is git-ignored, so say so and leave it.
+- **Copy the WHOLE project, not just the `.mpr` and `mprcontents`.** This is the trap.
+  `mx.exe check` resolves design properties against the project's `theme/` folder, so a copy
+  without it reports every styled widget as broken:
+
+  ```
+  [error] [CE6083] "Design property Spacing is not supported by your theme." at Layout grid 'layoutGrid1'
+  [error] [CE6083] "Design property Flex container is not supported by your theme." at Container 'container2'
+  ```
+
+  Measured: a copy of `.mpr` + `mprcontents` produced **7 of these, all false**, on a project that
+  checks at 0 errors. They name Atlas widgets the build never touched — which is the tell. Copy
+  everything except the build output:
+
+  ```bash
+  P=/path/to/project; C=$P/.mendix-cache/dash-scratch/mxcheck-copy
+  rm -rf $C; mkdir -p $C
+  for f in $P/*; do case "$(basename "$f")" in
+    deployment|releases|.mendix-cache) ;;          # build output and this scratch dir
+    *) cp -r "$f" $C/ ;;
+  esac; done
+  "/c/Program Files/Mendix/<version>/modeler/mx.exe" check $C/<App>.mpr
+  ```
+
+  **If CE6083 appears, suspect your copy before you suspect the project.** Re-run the check against
+  the real `.mpr` with Studio Pro closed; if the errors vanish, they were the missing theme.
+- Run it on that copy, or against the real project with Studio Pro closed — it loads the `.mpr` and
+  the IDE holds a lock. Expect a file in the copy to stay locked afterwards; the folder is
+  git-ignored, so say so and leave it.
+- **Use an absolute path for `-p` and for the copy.** A `cd` in one shell call persists into the
+  next, and `mxcli -p <App>.mpr` then answers `Error: failed to connect: mpr file not found:
+  <App>.mpr` from the scratch directory — which reads like a broken project, and is a wrong cwd.
 - **Put the exact output in the report**, errors or none. "0 errors" from a project-wide checker is
   the strongest statement a build can make about itself, and it is worth two lines.
 - It does not replace the per-step `ped_check_errors` gate. That one tells you *which* write broke
@@ -272,7 +348,8 @@ wrong — so the verification is the skill, and the writing is the easy part.
 Specifically, do not assume any of these, all of which held in that run:
 
 - `mxcli check` passing means correct. It validates syntax and references, not type alignment
-  across documents, not visibility-expression context, not CSS at all.
+  across documents, not visibility-expression context, not CSS at all. **It has passed a script
+  that made the project unloadable** — see the loop-`CHANGE` rule in Step 3b.
 - `SUCCESS` from an MCP write means the result matches the intent.
 - Nothing validates stylesheets. If you write CSS, **grep the theme for every `var(--x)` you
   reference** — an invented custom property is a widget nobody can see, and no gate catches it.
