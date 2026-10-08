@@ -17,6 +17,14 @@
   Every subcommand here therefore resolves the PID from the lock file of the
   project it was given, and touches nothing else.
 
+  Before closing, the holder's window title is checked against the app name as a
+  SECOND opinion — not as the key. A title cannot tell two copies of the same app
+  apart, which is why the lock file stays the key, but it does tell two DIFFERENT
+  apps apart, and that is the case this guards: a stale lock whose PID has been
+  reused by another Studio Pro. A title that names a different app stops the
+  close; an empty or bare "Mendix Studio Pro" title does not, because a project
+  that failed to load leaves exactly that and still needs closing.
+
   CLOSING IS ALWAYS GRACEFUL. This script sends WM_CLOSE (CloseMainWindow) and
   waits. It never calls Kill, because a killed Studio Pro skips its shutdown work
   and leaves the lock file behind with a dead PID. If the close does not complete
@@ -87,6 +95,20 @@ function Get-Holder([string]$mpr) {
   return [pscustomobject]$res
 }
 
+# Does the holder's window look like THIS app? 'match' | 'other' | 'unknown'.
+#
+# Only 'other' is actionable, and only as a veto. A Studio Pro that is still
+# starting, or that failed to load its project, shows the bare product name or no
+# title at all — both are 'unknown', and both still belong to this project per the
+# lock file. Never promote this to an identity test: two copies of the same app
+# produce the same title, which is the whole reason the lock file is the key.
+function Test-HolderTitle([string]$title, [string]$app) {
+  if ([string]::IsNullOrWhiteSpace($title)) { return 'unknown' }
+  if ($title -eq 'Mendix Studio Pro') { return 'unknown' }
+  if ($title.IndexOf($app, [StringComparison]::OrdinalIgnoreCase) -ge 0) { return 'match' }
+  return 'other'
+}
+
 # Windows already knows how to open a .mpr, and the association points at the
 # Version Selector, which picks the Studio Pro matching the project's own version.
 # Reading it beats hardcoding a path on a machine with several versions installed.
@@ -105,6 +127,7 @@ function Get-OpenCommand {
 }
 
 $mpr = Resolve-Mpr $Project
+$app = [System.IO.Path]::GetFileNameWithoutExtension($mpr)
 
 switch ($Action) {
 
@@ -112,6 +135,11 @@ switch ($Action) {
     $h = Get-Holder $mpr
     if (-not $h.LockExists)      { Write-Output "closed: no lock file"; exit 0 }
     if ($h.Stale)                { Write-Output "STALE LOCK: $($h.Lock) names pid $($h.ProcessId), which is not a running Studio Pro."; exit 3 }
+    if ((Test-HolderTitle $h.Title $app) -eq 'other') {
+      Write-Output "WRONG HOLDER: $($h.Lock) names pid $($h.ProcessId), whose window is '$($h.Title)' - that does not name $app."
+      Write-Output 'Most likely a stale lock whose pid was reused by another Studio Pro. Do not close it.'
+      exit 3
+    }
     Write-Output "open: pid $($h.ProcessId), title '$($h.Title)'"
     exit 0
   }
@@ -166,6 +194,18 @@ switch ($Action) {
       exit 3
     }
 
+    # Second opinion before the one irreversible act in this script. A lock can
+    # name a pid that Windows has since handed to a DIFFERENT Studio Pro, and the
+    # ProcessName guard passes that happily — the title is what separates two
+    # apps. Refuse rather than guess: being wrong here closes a window someone
+    # else is working in.
+    if ((Test-HolderTitle $h.Title $app) -eq 'other') {
+      Write-Output "WRONG HOLDER: $($h.Lock) names pid $($h.ProcessId), whose window is '$($h.Title)' - that does not name $app."
+      Write-Output 'That is almost certainly a stale lock whose pid was reused by another Studio Pro, and'
+      Write-Output 'closing it would close an unrelated project. Leave it for the developer to judge.'
+      exit 3
+    }
+
     $proc = Get-Process -Id $h.ProcessId
     Write-Output "closing pid $($h.ProcessId) ('$($h.Title)')"
     $t0 = Get-Date
@@ -179,7 +219,7 @@ switch ($Action) {
     if (-not $proc.HasExited) {
       $el = [math]::Round(((Get-Date) - $t0).TotalSeconds, 1)
       Write-Output "DID NOT CLOSE after ${el}s. Studio Pro is still running (pid $($h.ProcessId))."
-      Write-Output 'That almost always means a dialog is waiting for a person — unsaved changes, or a'
+      Write-Output 'That almost always means a dialog is waiting for a person - unsaved changes, or a'
       Write-Output 'confirmation. This script will not force it: killing Studio Pro skips its shutdown'
       Write-Output 'work. Ask the developer to look at the window.'
       exit 2

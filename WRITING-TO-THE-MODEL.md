@@ -867,6 +867,13 @@ that picks a process by title, or by "the studiopro.exe that is running", will e
 someone's unsaved work. Check that the named PID is alive *and* is actually a `studiopro`, or PID
 reuse will point you at an unrelated process.
 
+The title is still worth one thing: a **veto**. It cannot tell two copies of the same app apart, but
+it tells two *different* apps apart perfectly — so before closing, check that the holder's title
+names the app you mean, and refuse if it names another one. That closes the gap the `studiopro`
+name-check leaves open: a stale lock whose PID Windows has handed to a Studio Pro working on
+something else. A veto only: an empty title, or the bare `Mendix Studio Pro`, means *still loading
+or failed to load*, which is the project's own instance and does need closing.
+
 **Closing gracefully** is `CloseMainWindow()` — the WM_CLOSE that clicking X sends. Measured: the
 process exits in **1.5–2.1s** and Studio Pro removes its own lock file on the way out. Never
 `Kill`/`taskkill`: that skips the shutdown work and leaves the lock behind naming a dead PID, which

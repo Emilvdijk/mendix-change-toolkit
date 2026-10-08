@@ -49,6 +49,21 @@ Then establish where Studio Pro is, because it decides what you can do at all:
 You will need both, in alternation. That is forced by the tooling, not a preference
 (`WRITING-TO-THE-MODEL.md` §18 — `mxcli --mcp` authors one construct in eight).
 
+**Then establish WHICH Studio Pro.** The MCP is one fixed address (`http://localhost:7782/mcp` on a
+default install) and nothing in it names a project. A second Studio Pro, open on a different app,
+is invisible to you: whichever instance holds that port answers every `ped_*` and `pg_*` call you
+make, and nothing warns you that it is the wrong model. Before the **first MCP write of a session**,
+and again after any reopen:
+
+```
+list_modules
+```
+
+The modules must be this project's. If they are not — or you cannot tell — **stop and ask before
+writing anything**. One read-only call, against the chance of authoring into an app nobody asked
+you to touch. (Reasoned from the single fixed port, not measured with two instances open: treat it
+as a check worth making rather than a failure that has been seen.)
+
 ## Step 1 — read the plan and build a routing table
 
 For every document the plan names, decide **who can author it** before touching anything. The
@@ -215,8 +230,13 @@ holding this project. **Never `taskkill`, never `Stop-Process`, and never pick a
 two Studio Pros on two copies of the same app have the identical title, so a title match will
 eventually close someone's unsaved work (§27 of `WRITING-TO-THE-MODEL.md`).
 
+Before closing, it also checks the holder's window title against the app name — not as the key (two
+copies of the same app share a title) but as a veto: a lock whose pid now belongs to a Studio Pro
+showing a *different* app is refused rather than closed.
+
 Exit 0 is success. **Exit 2 means it did not close, which is a dialog waiting for a person — say so
-and stop; do not force it.** Exit 3 is a stale lock, which is also theirs to judge. An open takes
+and stop; do not force it.** Exit 3 means the lock and reality disagree — a stale lock, or one
+pointing at another app's window — and that is theirs to judge, not yours to clean up. An open takes
 about 20 seconds and a close about 2, so check `status` afterwards rather than assuming.
 
 If your brief does not grant it, ask in one line and wait, exactly as for the gates above.
