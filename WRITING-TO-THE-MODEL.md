@@ -1,11 +1,12 @@
 # Writing to a Mendix model from an agent — what actually happens
 
-Field notes from three instrumented write runs against scratch apps, Mendix 11.12.4, Studio Pro MCP
+Field notes from four instrumented write runs against scratch apps, Mendix 11.12.4, Studio Pro MCP
 server on `localhost:7782`, mxcli v0.24.0: a weather widget built from nothing (§1–18, 2026-10-02/03),
-a starter-module removal (§19–23, 2026-10-06) and a REST integration of 16 documents (§24–26,
-2026-10-07). The second run corrected one of the first run's conclusions — see §19. The third is the
-only one that produced a project no tool could open, and it did so from a script that passed the
-dry run — see §24.
+a starter-module removal (§19–23, 2026-10-06), a REST integration of 16 documents (§24–26,
+2026-10-07) and a 40-document platform-API connector (§28–31, 2026-10-08). The second run corrected
+one of the first run's conclusions — see §19. The third is the only one that produced a project no
+tool could open, and it did so from a script that passed the dry run — see §24. The fourth ran seven
+hours without the MCP tools and nobody noticed until the report — see §31.
 
 Everything here was measured during the run. Where a published capability list disagrees with
 what the server did, the server wins and the disagreement is recorded.
@@ -899,6 +900,104 @@ So the three states read cleanly:
 
 `tools/studiopro.ps1` in this toolkit implements the above — `status`, `open`, `close` against one
 `.mpr` — and exits 0 on success, 2 when something is waiting for a person, 3 on a stale lock.
+
+## 28. A Marketplace module cannot be installed by an agent, and its import leaves errors only a person can clear
+
+Two separate blockers, both measured 2026-10-08 while adding an encryption module.
+
+**Install.** The MCP server exposes `install_marketplace_module(versionId, moduleName,
+conflictResolution)`. `versionId` is a Marketplace **version UUID** and is required. Its own
+description says to get one from `Component_GetComponentIDsByCriteria` — which is **not among the
+18 tools the server lists**. Nothing exposed maps a component name, or a component id, to a version
+UUID. The public Marketplace API is no way round it either: both
+`GET https://marketplace-api.mendix.com/v1/content/{id}/versions` and `…/v1/content/{id}` answer
+`401 Unauthorized` without a token, and the Marketplace web page does not print the UUID.
+
+So: **installing a Marketplace module is a person's job.** Not because it is dangerous — because
+the identifier the one tool needs cannot be obtained.
+
+Worth trying later, in order: a PAT with the Marketplace content read scope; a newer Studio Pro that
+may expose the lookup tool; or a small hand-made table of version UUIDs for the modules a team
+actually uses. Untested: whether `install_marketplace_module` additionally requires Studio Pro to be
+signed in to the Platform, as its description claims.
+
+**And then the import breaks the validator.** After the module landed, `mx.exe check` reported three
+errors, all inside it:
+
+```
+[error] [CE0463] The definition of this widget has changed. Update this widget by right-clicking it
+and selecting 'Update widget', or select 'Update all widgets' ... at Data grid 2 'dataGrid21'
+```
+
+The module's example screens were built against an older Data grid 2 than the app's. Nothing in the
+toolchain clears this:
+
+- `mxcli widget sync --dry-run` reported `No schema drift` on all three documents, and its own help
+  says it covers only part of `CE0463` (7 of 40 on its reference fixture).
+- `mxcli fix widgets` and `mxcli widget sync` would **write into the Marketplace module**, whose
+  `list_modules` entry is `writable: false`.
+- Mendix's own `mx update-widgets` clears all 40 but, per mxcli's help, **destroys `mprcontents/` on
+  MPR v2 projects** — which this was.
+- The MCP has no widget-update tool.
+
+A person ran "Update all widgets" in Studio Pro and the check went to 0 errors. Treat `CE0463` after
+an import as a gate, not a defect to fix.
+
+## 29. A loop may not contain an end event or custom error handling
+
+`CE0068` *"End events cannot be placed inside a loop"* and `CE0644` *"Error handling type must be
+'Rollback' inside a looped activity"*. Three of each, from one script that paged three REST
+resources with the call and its error handler inside the paging loop.
+
+The fix is structural, not cosmetic: **put the paged call in its own microflow** and let the loop do
+nothing but add up page sizes and decide whether to go round again. One `*Page` microflow per paged
+resource.
+
+What makes this worth its own section is which gate caught it. `mxcli check` **passed** the in-loop
+version. The project-wide `mx.exe check` on a scratch copy failed it with six errors, before
+anything reached the real project — the scratch-copy rule from §24 working exactly as intended, on a
+defect of a completely different kind. Two runs, two classes of breakage, same cheap gate.
+
+## 30. Two ways a build quietly commits something it should not
+
+Neither is a tool defect. Both are places where a correct-looking build writes a value into the
+model, and the model is a git repository.
+
+**A constant in the SHARED configuration is in the repository.** An encryption key set in the
+`Default` shared configuration lands in the project-settings unit, which is tracked. Everyone who
+clones gets the key, and the key is what protects whatever the app stores encrypted — in that run,
+platform tokens that work from anywhere. The **private** configuration writes to
+`project-settings.user.json`, which Mendix's own `.gitignore` already excludes. For anything secret,
+private is the only correct answer, and the difference is invisible in the model afterwards.
+
+**A JSON structure stores its sample snippet in the model.** Paste a live response into one and
+every name, e-mail address, account name and id in it is now in git, in a document nobody thinks of
+as data. Keep the live *shape* and replace the values with neutral ones — the structure only needs
+the types. Then grep `mprcontents/` for the identifying strings rather than trusting the edit; in
+that run the sweep came back clean except for the project UUID, which was already committed in an
+unrelated widget's configuration.
+
+## 31. Whether the MCP tools exist is decided before the session starts
+
+An agent runner negotiates its MCP servers **once, at startup**. A server that is not answering at
+that moment is marked failed for the whole session: its tools never appear, and starting Studio Pro
+afterwards does not bring them back.
+
+Measured 2026-10-08. A seven-hour build session launched with Studio Pro closed. Every
+`mcp__mendix__*` tool was absent for the entire run, including `ped_check_errors`, the only
+per-document validator. The agent reached the server afterwards by writing its own JSON-RPC client
+(`initialize` → `tools/list` → `tools/call`) against `localhost:7782/mcp` — which worked, and is
+evidence the server was up by then, not evidence that the session had recovered.
+
+This matters more here than in most places, because a build **alternates** by design: mxcli writes
+need Studio Pro closed, the MCP needs it open (§4). It is therefore normal to start a build with
+Studio Pro closed — and that is exactly the state that costs the session half its tools.
+
+So the ordering rule, for whatever launches the session: **make the MCP answer before the agent
+process starts**, not before the first MCP call. Opening Studio Pro first costs 16–18s (§27) and is
+mechanical. And whatever launches it should say which way it went, because the agent cannot tell a
+missing tool from a server that happens to be down this second — and will spend tokens working
+around a capability it was told, by its own tool list, that it had.
 
 ## Status of this run — complete
 

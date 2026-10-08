@@ -91,6 +91,8 @@ Measured routing on Mendix 11.12.4 — **re-check, do not memorise**:
 | Layout: drop ONE widget from an existing one | mxcli `alter layout … drop widget <id>` — edits in place, leaves the rest byte-identical |
 | Layout: drop a layout-grid COLUMN, or rename a layout | **a person** — `drop widget col3` answers `widget "col3" not found` and applies nothing; no tool anywhere can rename a layout |
 | Remove a module | **a person** in Studio Pro — and see Step 3f, it leaves the user roles behind |
+| **Install** a Marketplace module | **a person** — `install_marketplace_module` needs a Marketplace version UUID and nothing exposed resolves one (§28) |
+| `CE0463` "the definition of this widget has changed", after an import | **a person**: "Update all widgets" in Studio Pro. No tool clears it, and the errors are inside a `writable: false` module anyway (§28) |
 | Anything in a `writable: false` module | **a person** |
 | CSS / theme files | plain file write |
 | `ped_check_errors` | MCP — needs Studio Pro open |
@@ -163,6 +165,12 @@ nothing and nothing has been written yet.
 unloadable. **If a script contains a `CHANGE` on a loop variable, or any statement shape you have
 not written before, apply it to a scratch copy and run `mx.exe check` on that copy first.** That
 costs one copy and one check; the alternative is a project nobody can open.
+
+It also passes a second thing Mendix rejects: **a loop may not contain an end event (`CE0068`) or an
+activity with custom error handling (`CE0644`)**. So a paged REST call cannot sit inside its own
+paging loop. Put the call in its own microflow, returning the page size, and let the loop do nothing
+but add up and decide whether to go round again. `mxcli check` passed the in-loop version; `mx.exe
+check` on the scratch copy caught it with six errors before it reached the project (§29).
 
 For an MCP write there is no dry run, so re-read the schema instead and build the call carefully.
 
@@ -398,6 +406,17 @@ Specifically, do not assume any of these, all of which held in that run:
 
 - Execute the plan. Do not redesign it. Report disagreement in writing and stop.
 - Never commit, never push, never switch branch, never fetch.
+- **A secret never goes in a SHARED constant configuration.** Shared values live in the model, so
+  they land in git and everyone who clones gets them. The private configuration writes to
+  `project-settings.user.json`, which Mendix's `.gitignore` already excludes. Keys, tokens,
+  passwords: private, every time. The two look identical afterwards, which is why it has to be
+  right the first time (§30).
+- **A JSON structure stores its sample snippet in the model.** A live response pasted into one puts
+  every name, e-mail and id in it into git. Keep the shape, neutralise the values, then grep
+  `mprcontents/` for the identifying strings rather than trusting the edit (§30).
+- **Studio Pro stages its own saves.** `git diff --cached` can list files this build never touched —
+  a Marketplace import stages its jars. Do not unstage them and do not claim them; report them under
+  "changes this build did not make" (§23).
 - Only ever author into modules the project owns. Never write a Marketplace module.
 - Never run the app, never deploy, never touch Mendix Cloud.
 - If a step cannot be done, that is a result. Report it and carry on with the steps that do not
