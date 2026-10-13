@@ -86,6 +86,7 @@ Installed skills:
   /mendix-test-instructions test steps derived from what actually changed
   /mendix-change-notes      customer/team-facing change note
   /mendix-change-report     all three in one pass
+  /mendix-oql               Mendix OQL dialect reference for writing and fixing queries
 
 Note: the tools are bash scripts. Git for Windows (Git Bash) provides the required
 bash, and is already a dependency of any Mendix git workflow.

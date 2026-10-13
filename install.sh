@@ -81,6 +81,7 @@ Installed skills:
   /mendix-test-instructions test steps derived from what actually changed
   /mendix-change-notes      customer/team-facing change note
   /mendix-change-report     all three in one pass
+  /mendix-oql               Mendix OQL dialect reference for writing and fixing queries
 
 If the project lives elsewhere, cd into it first - the tools always operate on the
 git repo of your current directory.
