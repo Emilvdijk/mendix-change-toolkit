@@ -60,11 +60,23 @@ make. It could not. The MCP has no layout document type at all (`Forms$Layout` a
 are both "Unknown document type"), and mxcli would have deleted two sidebar toggle widgets from
 every page in the app.
 
+**Half of that changed in mxcli v0.26, so route layouts in two cases, not one.** `ALTER LAYOUT`
+now carries the whole `ALTER PAGE` operation set and edits in place, `DESCRIBE LAYOUT` emits a
+re-executable `CREATE LAYOUT`, and `ALTER PAGES … SET LAYOUT = … WHERE LAYOUT = …` repoints pages
+in bulk — so **a layout the app owns is now authorable by mxcli**, and planning it as a person's
+job wastes the developer's afternoon. A **Marketplace** layout is not: `alter layout` refuses the
+target outright, which is better than the silent widget loss above but routes to a person just the
+same. The MCP still has no layout type either way. Renaming a layout is still impossible for every
+tool, and a *rewrite* of a layout nobody here authored is still only as complete as its describe —
+plan the `alter`, never the rewrite. (§33 of `WRITING-TO-THE-MODEL.md`; read from mxcli v0.26,
+not yet measured on a run, so say in the plan that the route is unproven.)
+
 So, in **Documents to change**, mark each row with who can author it:
 
 | Document | Module writable? | Authorable by |
 |---|---|---|
 | `SampleApp.Snippet_Foo` | yes | mxcli or MCP |
+| `SampleApp.App_Default` (a layout you own) | yes | mxcli `ALTER LAYOUT` — v0.26, unproven here |
 | `SomeMarketplace.SomeLayout` | **no** | **a person in Studio Pro** |
 
 A plan that ends with "and then a person adds one widget call in Studio Pro" is a *better* plan

@@ -11,6 +11,11 @@ returns, measured, and which to reach for. Nothing here is taken from a help tex
 > claims in this file went stale between mxcli v0.16 and v0.24, and Studio Pro 11.15 already
 > carries MCP changes that may close others. Treat this as a dated measurement, not a
 > specification, and re-probe before trusting it on a different version.
+>
+> **The installed mxcli is now v0.26.0** (built 2026-10-11), two releases past everything measured
+> below. The layout findings in particular have moved — see §33 of `WRITING-TO-THE-MODEL.md`,
+> which also states what in them expired rather than reversed. Nothing in this file has been
+> re-measured on v0.26.
 
 Measured 2026-10-02 against a production ERP project (`<app>.mpr`, Mendix **11.12.4**, 41 modules,
 998 microflows, 231 pages, 15,044 activities) with **mxcli v0.24.0**, **mxlint v3.18.0** and the
@@ -251,6 +256,14 @@ before nor the after. Use it only for questions about the model as it stands rig
 
 Re-tested on mxcli v0.24.0 / mxlint v3.18.0. **Do not carry these forward from older notes.**
 
+- **mxcli can edit layouts. This is a v0.26 change and it is read from the tool, not measured.**
+  Every "a layout is a person's job" statement in this toolkit was written against v0.24, where
+  the only layout verb was `alter layout … drop widget <id>`. v0.26 gives `ALTER LAYOUT` the full
+  `ALTER PAGE` operation set, makes `DESCRIBE LAYOUT` emit a re-executable `CREATE LAYOUT`, and
+  adds `ALTER PAGES … SET LAYOUT … WHERE LAYOUT = …` for repointing pages in bulk. Renaming a
+  layout is still impossible and a rewrite is still only as complete as its describe. The full
+  revision, with what expired versus what reversed, is §33 of `WRITING-TO-THE-MODEL.md`.
+
 - **Multi-clause XPath truncation is FIXED.** mxcli renders every clause:
   ```
   retrieve $InvoiceList from Sales.Invoice
@@ -316,9 +329,10 @@ New, not previously recorded:
 
 ---
 
-## 7. mxcli v0.24 commands this toolkit does not yet use
+## 7. mxcli commands this toolkit does not yet use
 
-All read-only:
+All read-only. The list was written against v0.24; the entries marked **v0.26** are new and have
+not been tried here:
 
 - `graph-report` — god nodes, coupling, cohesion, dead code.
 - `structure` / `project-tree` — compact project overview, JSON.
@@ -329,6 +343,15 @@ All read-only:
   `aimodel`, `knowledgebase`, `consumedmcpservice`, `datatransformer`.
 - `mcp capabilities --mcp <url> -p <app>.mpr` — asks the connected Studio Pro what it can author.
   Quote it in bug reports rather than a version number.
+- **v0.26** `changelog` — the release notes, offline, out of the installed binary. This is the
+  cheapest way to find out what moved since a note in these files was written, and it is where
+  §33 of `WRITING-TO-THE-MODEL.md` came from.
+- **v0.26** `syntax [topic …]` — the MDL reference from the feature registry, `--json` for a
+  machine read. `mxcli syntax layout` is what revised §22. Ask it before believing any capability
+  claim in these files, this line included.
+- **v0.26** `diag session-report` — where an agent session's calls and tokens went, read from its
+  own Claude Code transcript. Relevant to Dash, which has the transcripts.
+- **v0.26** `describe structure depth 2|3` — now lists each page's data widgets.
 
 ---
 
@@ -338,7 +361,17 @@ All read-only:
 
 - Only these mxcli verbs: `describe`, `context`, `callers`, `callees`, `refs`, `impact`,
   `search`, `show`, `structure`, `project-tree`, `graph-report`, `report`, `mcp capabilities`,
-  `refresh catalog`. **Never `exec`, `fix`, `rename`, `layout`, `new`, or any MDL write.**
+  `refresh catalog`, `changelog`, `syntax`. **Never `exec`, `fix`, `rename`, `layout`, `new`,
+  or any MDL write.** (`layout` here is the subcommand that rearranges a domain model, which
+  writes. It is unrelated to `ALTER LAYOUT`, which is MDL and also forbidden here.)
+- **The allowlist is the whole guarantee, so it must stay closed as mxcli grows.** v0.26 ships
+  verbs that leave the model entirely: `auth` (platform credentials), `git` (including
+  `git note --write`), `docker`, `tunnel-hub` (a public ingress relay), `catalog`,
+  `marketplace`, `run`, `test`, `debug`, `sql`, `oql`, `playwright`, `serve`, `theme`,
+  `skill`, `init`, `add-tool`. None of them is read-only-against-the-model in the sense this
+  file means, several touch credentials or the network, and `git` collides head-on with the rule
+  that no toolkit run goes near a remote (§33 of `WRITING-TO-THE-MODEL.md`). Enumerate what is
+  allowed; never subtract from what is not.
 - **Never pass `--mcp`.** It routes model writes into the running Studio Pro. mxcli's own `mcp`
   subcommand prints `WARNING: This is a vibe-coded PoC, alpha quality, use with caution.` on
   every invocation — believe it.
@@ -351,6 +384,13 @@ All read-only:
   design assumes exactly that pairing. mxcli *writes* while the project is open stay forbidden.
 - mxlint `export` is read-only against the `.mpr`, but it **writes a `modelsource/` tree**. Point
   it somewhere scratch via a config file rather than letting it land in the project.
+- **Local git only. Never `fetch`, `pull`, `push` or `ls-remote`.** A Team Server remote wants a
+  credential an agent does not have, and the Git Credential Manager answers by opening a **GUI
+  dialog** — so the command *hangs* rather than fails, which from outside is indistinguishable from
+  a slow read. `GIT_TERMINAL_PROMPT=0` does not prevent it; that suppresses the terminal prompt,
+  not the window. `status`, `log`, `rev-parse`, `diff` and `show` against what is already cloned
+  are all fine and are the only git this toolkit needs. If a checkout turns out to be behind, say
+  so and stop — a person pulls, in Studio Pro. Measured 2026-10-11; see WRITING-TO-THE-MODEL §32.
 
 ---
 

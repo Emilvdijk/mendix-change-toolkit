@@ -1,7 +1,7 @@
 # mendix-change-toolkit
 
-Real diffs for Mendix projects, and eight Claude skills built on them — from triaging a story
-nobody has started to building one into the model.
+Real diffs for Mendix projects, and nine Claude skills — eight built on those diffs, from triaging a story
+nobody has started to building one into the model, and one reference for the Mendix OQL dialect.
 
 Mendix stores the whole model in binaries (`YourApp.mpr` + `mprcontents/**.mxunit`), so a
 commit shows up in git as `Bin 446464 -> 446464 bytes` and nothing else. This toolkit
@@ -37,6 +37,12 @@ rather than being installed:
 
 Last verified against **mxcli v0.24.0** and **mxlint v3.18.0** on Mendix 11.12.4, reading
 2026-10-02 and writing 2026-10-06.
+
+> **The installed mxcli is v0.26.0** (built 2026-10-11, in use here from 2026-10-13). Nothing in
+> this toolkit has been re-measured on it. What is known to have moved — layouts above all, which
+> are no longer a person's job — is in §33 of [WRITING-TO-THE-MODEL.md](WRITING-TO-THE-MODEL.md),
+> written from `mxcli changelog` and `mxcli syntax`, not from a run. `mxcli changelog` is
+> offline and in the binary; it is the cheapest way to check a claim here before relying on it.
 
 **[MODEL-READING.md](MODEL-READING.md) is the capability matrix** — mxcli vs mxlint vs the
 Studio Pro MCP vs raw BSON, measured on the same documents, with the sizes. Read it before
@@ -167,6 +173,12 @@ The other five start from a change that already exists, and read commits rather 
 | `mendix-change-report` | review + tests + notes in one pass (collects once) | no |
 | `explain-mendix-doc-complete` | one document, at the highest fidelity available | no |
 
+One is a reference rather than a workflow. It reads no commits and needs none of the tools above:
+
+| Skill | Use it for | Writes? |
+|---|---|---|
+| `mendix-oql` | the Mendix OQL dialect — how it differs from SQL, what Studio Pro 11.12.4 accepts and rejects, association direction, view-entity rules, proven query patterns — for any agent writing, reviewing or fixing OQL | no (outputs query text for a person to paste) |
+
 Invoke by name (`/mendix-review`) or just describe the task — the descriptions are written to
 trigger on things like "review the last 5 commits", "how do we test this", "what do I tell
 the customer", "what am I about to pull", "plan this story", "is this ready to pick up".
@@ -294,10 +306,13 @@ Found by testing, not assumed:
   `<type>:<Module.Name>`, and `mirror-gaps.sh` prints the typed form for you.
 - **`mxcli refs` and `mxcli impact` do not index snippet-call placement.** A snippet sitting on
   a layout reports `(no references found)` from both — measured on v0.24.0, two snippets, both
-  placed. Microflow calls and widget actions ARE indexed, which is what makes the silence
+  placed. (Not re-measured on v0.26, which added a `widgets` table to the catalog recording the
+  widget tree and `ParentWidgetId` — worth a re-probe before reaching for `usages.js`.) Microflow calls and widget actions ARE indexed, which is what makes the silence
   convincing. `usages.js` reads the BSON and finds it.
-- **`mxcli`'s `CATALOG.ACTIVITIES` omits activities inside loops** (v0.24.0). A loop or while
-  body is invisible to it: a catalog sweep for `DeleteObjectAction` found 150 deletes where the
+- **`mxcli`'s `CATALOG.ACTIVITIES` omits activities inside loops** (v0.24.0; **re-check on
+  v0.26** — the catalog gained `TotalActivityCount`, "loop bodies included, at any depth", so it
+  may now traverse them, though the ACTIVITIES table itself is named in neither release note).
+  A loop or while body is invisible to it: a catalog sweep for `DeleteObjectAction` found 150 deletes where the
   BSON holds 160, and the 10 it missed, all in loop bodies, included the delete that was the bug.
   `actions.js` answers any "every place that does X" question from the BSON and reports loop
   depth.
@@ -364,4 +379,5 @@ skills/
   mendix-change-notes/
   mendix-change-report/
   explain-mendix-doc-complete/   one document, read at the highest fidelity available
+  mendix-oql/                    the Mendix OQL dialect, for writing and fixing queries
 ```

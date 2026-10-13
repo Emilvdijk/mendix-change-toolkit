@@ -32,6 +32,12 @@ git -C <checkout> rev-parse --short HEAD
 **Report what is already dirty before you write anything.** The developer needs to be able to tell
 your changes from theirs, and after you run, `git status` is the only thing that does.
 
+**Local git only — never `fetch`, `pull`, `push` or `ls-remote`.** The Team Server wants a
+credential you do not have, and the Git Credential Manager answers with a GUI dialog, so the
+command hangs instead of failing and your run spends its budget on a window nobody can see.
+`GIT_TERMINAL_PROMPT=0` does not stop it. If the checkout is behind, say so and stop: a person
+pulls, in Studio Pro. (MODEL-READING §8, WRITING-TO-THE-MODEL §32.)
+
 Refuse to start, and say why, if:
 
 - there is **no plan**. This skill executes a plan; without one, run `mendix-plan` first.
@@ -76,7 +82,11 @@ ped_get_schema <type>   -> the real constructor contract for an MCP write
 mxcli syntax <topic>    -> the real MDL form for an mxcli write
 ```
 
-Measured routing on Mendix 11.12.4 — **re-check, do not memorise**:
+Measured routing on Mendix 11.12.4 — **re-check, do not memorise**. Most rows were measured on
+mxcli v0.24.0; the layout rows are from **v0.26.0** and were read out of `mxcli syntax layout`,
+not proven by a write. `mxcli syntax <topic>` and `mxcli changelog` are both offline and both
+in the binary — when a row looks wrong, ask them rather than working around it, and say in the
+report which row you corrected:
 
 | Needed | Writer |
 |---|---|
@@ -87,9 +97,13 @@ Measured routing on Mendix 11.12.4 — **re-check, do not memorise**:
 | Nanoflow | **mxcli only** |
 | Snippet, page widget tree | **mxcli only** — the MCP cannot even read a snippet |
 | Allowed roles / `GRANT EXECUTE` | **mxcli only** |
-| Layout: a new one, or a widget tree rewrite | **a person** — no MCP layout type, and mxcli drops widgets it cannot author |
-| Layout: drop ONE widget from an existing one | mxcli `alter layout … drop widget <id>` — edits in place, leaves the rest byte-identical |
-| Layout: drop a layout-grid COLUMN, or rename a layout | **a person** — `drop widget col3` answers `widget "col3" not found` and applies nothing; no tool anywhere can rename a layout |
+| Layout: edit one you own | **mxcli `alter layout`** — `INSERT INTO <scrollContainer>.<slot>`, `INSERT BEFORE` / `INSERT AFTER`, `SET (…) ON`, `DROP a, b`, `REPLACE … WITH`. Edits in place; the rest stays byte-identical. New in v0.26 — §33 |
+| Layout: a new one | mxcli — `DESCRIBE LAYOUT` emits re-executable `CREATE LAYOUT`, so describe-rename-exec copies one. Still no MCP layout type |
+| Layout: rewrite the widget tree of one you did NOT author | **a person** — mxcli's own guidance: *"a rewrite is only as complete as its describe"*. Use `alter layout` instead |
+| Layout: anything in a Marketplace module | **a person** — `alter layout` now refuses a Marketplace target outright, rather than silently dropping what it cannot author |
+| Repoint pages onto a different layout | mxcli — `ALTER PAGE … SET Layout = M.L [MAP (Old AS New)]`, or `ALTER PAGES [IN <module>] SET LAYOUT = … WHERE LAYOUT = …` for the bulk form |
+| Layout: drop a layout-grid COLUMN | **unverified on v0.26** — refused on v0.24, but the spelling changed from `drop widget col3` to `DROP col3`, so the old error is no longer evidence. Try it; if it refuses, it is a person's job |
+| **Rename** a layout | **a person** — `mxcli rename` still has no layout type (re-checked on v0.26: eleven types, layout is not one), and a rename is the only thing that updates the references |
 | Remove a module | **a person** in Studio Pro — and see Step 3f, it leaves the user roles behind |
 | **Install** a Marketplace module | **a person** — `install_marketplace_module` needs a Marketplace version UUID and nothing exposed resolves one (§28) |
 | `CE0463` "the definition of this widget has changed", after an import | **a person**: "Update all widgets" in Studio Pro. No tool clears it, and the errors are inside a `writable: false` module anyway (§28) |
@@ -219,7 +233,8 @@ Then `grep -r '<ModuleName>\.' mprcontents/` for anything else still pointing at
 | MCP needs Studio Pro **open** | the server *is* Studio Pro | stop, ask, continue when told |
 | Saving an **MCP** write | no save tool exists in the 18 | stop, ask |
 | "Update security" **when Studio Pro shows the prompt** | no tool exposes that button | stop, ask |
-| A layout rename, a layout-grid column, or any `writable: false` module | no tool can author it | leave it to the developer, say exactly what to do |
+| A layout **rename**, or any `writable: false` module | no tool can author it | leave it to the developer, say exactly what to do |
+| A layout-grid **column** | refused on v0.24 under a spelling that no longer exists; unverified on v0.26 | try `DROP <col>` once. If it refuses, hand it over and say so — do not rewrite the layout to get around it |
 | Running the app | no tool here does it | leave it to the developer |
 
 At every gate: **say precisely what you need, and what you will do next.** "Close Studio Pro and

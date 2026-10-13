@@ -3,7 +3,10 @@
 Field notes from four instrumented write runs against scratch apps, Mendix 11.12.4, Studio Pro MCP
 server on `localhost:7782`, mxcli v0.24.0: a weather widget built from nothing (§1–18, 2026-10-02/03),
 a starter-module removal (§19–23, 2026-10-06), a REST integration of 16 documents (§24–26,
-2026-10-07) and a 40-document platform-API connector (§28–31, 2026-10-08). The second run corrected
+2026-10-07) and a 40-document platform-API connector (§28–31, 2026-10-08). §32 is not from a run —
+it is the checkout itself, measured 2026-10-11 when a fetch stopped on a dialog. §33 is not from a
+run either — it is what mxcli v0.26.0 says about itself, read on 2026-10-13, and it revises the
+layout findings in §22. The second run corrected
 one of the first run's conclusions — see §19. The third is the only one that produced a project no
 tool could open, and it did so from a script that passed the dry run — see §24. The fourth ran seven
 hours without the MCP tools and nobody noticed until the report — see §31.
@@ -16,6 +19,8 @@ across both write paths, with a person doing the five steps no tool can (§15). 
 without error and the widget works.
 
 > **These findings are properties of Mendix 11.12.4**, with mxcli v0.24.0 and mxlint v3.18.0 —
+> and the installed mxcli is now **v0.26.0** (§33), so every mxcli gap below is a gap on a version
+> two releases old. §33 lists the ones known to have moved; it cannot list the ones nobody checked.
 > not of the tools in general. Every gap recorded here is a gap *on this version*. Studio Pro
 > 11.15 already carries MCP changes (scoped `ped_check_errors` among them, per mxcli#922) that may
 > close some of them, and both CLIs move fast: two claims in this toolkit's own notes went stale
@@ -737,6 +742,13 @@ Never from `refs`.
 
 ## 22. Two more things no tool can author on a layout
 
+> **Partly superseded by §33 — read that first.** These were measured on mxcli v0.24.0 and were
+> true then. On v0.26 the rename finding stands unchanged, the Marketplace consequence has become
+> an explicit refusal, and the layout-grid column measurement has **expired** rather than been
+> reversed: the statement it tested no longer has that spelling. The rest of this section — above
+> all the closing paragraph on `alter` versus a rewrite — is still the operative guidance, and
+> mxcli now says the same thing in its own syntax help.
+
 Both were hit while removing a widget from a copied layout, and both extend the layout findings in
 `MODEL-READING.md`:
 
@@ -746,7 +758,8 @@ Both were hit while removing a widget from a copied layout, and both extend the 
   layout copied in Studio Pro therefore keeps the name Studio Pro gave it (`<Name>_2`) until a
   person renames it — which is also the only way the references get updated.
 - **`alter layout … drop widget <column>` cannot drop a layout-grid column.** It answers
-  `Error: failed to drop: widget "col3" not found` and applies nothing. Only the widgets *inside*
+  `Error: failed to drop: widget "col3" not found` and applies nothing. *(v0.24. The spelling is
+  `DROP col3` on v0.26 and this is now unverified rather than refused — §33.)* Only the widgets *inside*
   the column can be dropped, which leaves an empty AutoFill column behind. If that gap is visible
   in the rendered page, deleting the column is a person's job.
 
@@ -998,6 +1011,134 @@ process starts**, not before the first MCP call. Opening Studio Pro first costs 
 mechanical. And whatever launches it should say which way it went, because the agent cannot tell a
 missing tool from a server that happens to be down this second — and will spend tokens working
 around a capability it was told, by its own tool list, that it had.
+
+## 32. An agent cannot reach the Team Server, and the failure is a hang
+
+Measured 2026-10-11, from a shell in which every other git command worked. `git fetch origin` in a
+Mendix Team Server checkout opened a **Git Credential Manager GUI dialog** and blocked there until
+a person dismissed it:
+
+```
+fatal: User cancelled dialog.
+bash: line 1: /dev/tty: No such device or address
+```
+
+Read that output carefully, because it contains the whole lesson. The dialog is a **window**, not a
+terminal prompt, so the guard everyone reaches for does not stop it: `GIT_TERMINAL_PROMPT=0`
+suppresses the TTY prompt only, and GCM falls back to its GUI. Silencing that needs
+`GCM_INTERACTIVE=never` as well — and the result is then a clean failure, not a success, because the
+credential still is not there. The `/dev/tty` line is git's second attempt after the cancel.
+
+So the rule is not "should not fetch", it is **cannot**. And the failure mode is what makes it worth
+a section: with no guard this does not return an error, it **hangs**. From outside, a hung fetch
+looks exactly like a slow analysis — a metered run sits there spending its budget on a dialog
+nobody can see, and a background job sits there until its timeout.
+
+What works instead:
+
+- **Local git only**, against what is already cloned: `status`, `log`, `rev-parse`, `diff`, `show`.
+  Every skill in this toolkit already confines itself to these. This is the reason, written down.
+- **A person pulls, in Studio Pro.** That is the supported path for Team Server, and it is also the
+  only one that updates the `.mpr` without fighting whatever has it open.
+- **If the checkout is behind, say so and stop.** Reporting it costs a line; "fixing" it costs the
+  run. A plan or review written against a stale checkout names documents that have since been
+  renamed and proposes work somebody already did, which is worse than no plan at all.
+
+Automation that genuinely must fetch has to bring its own credential *and* its own guard: an
+explicit token on the request (`-c credential.helper=` plus an `http.extraHeader` Authorization),
+`GIT_TERMINAL_PROMPT=0` and `GCM_INTERACTIVE=never` on every child that can reach git, and a
+timeout. One more trap there, measured earlier: passing the token that way puts it in **argv**, and
+a non-zero exit with empty stderr falls through to a message containing the whole command line — so
+the token reaches logs, prompts and reports unless it is scrubbed by shape at the single point every
+caller passes through.
+
+This is the same class of problem as §31: a capability an agent believes it has, which is actually
+decided by the environment before it ever asks.
+
+## 33. mxcli v0.26 makes layouts a first-class target, and this is not from a run
+
+**Provenance, stated plainly: nothing below was measured by writing to a model.** It is `mxcli
+changelog` and `mxcli syntax layout` read out of the installed binary on 2026-10-13 — v0.26.0,
+built 2026-10-11 — after the toolkit jumped v0.24.0 → v0.26.0 in one step. Everything else in
+this file is a measurement; this section is a capability statement from the tool about itself,
+which is exactly the kind of claim §4 says to distrust. Treat each row as *worth trying*, not as
+proven, and correct it here from the first real run.
+
+### Layouts
+
+§22 and the build skill's routing table both said **a person**, on the strength of v0.24 probes.
+That is no longer the shape of the gap. `mxcli syntax layout` now lists `layout.alter`,
+`layout.drop` and `layout.show`, and `ALTER LAYOUT` carries the whole `ALTER PAGE` operation set:
+
+```
+ALTER LAYOUT Module.Name {
+  INSERT INTO <scrollContainer>.<top|right|bottom|left|center> { <widgets> };
+  INSERT BEFORE|AFTER <widgetName> { <widgets> };
+  SET (<property>: <value>) ON <widgetName>;
+  DROP <name1>, <name2>;
+  REPLACE <widgetName> WITH { <widgets> };
+};
+```
+
+A region has no name of its own — its slot is its identity — so `INSERT INTO` addresses it as
+`<scrollContainer>.<slot>`, while `BEFORE`/`AFTER` position among siblings and name a widget.
+
+Three more things that did not exist at v0.24:
+
+- **`DESCRIBE LAYOUT Module.Name` emits a re-executable `CREATE LAYOUT`.** mxcli's own example is
+  *"Copy an Atlas layout into your own module: describe it, rename it, run it."* Authoring a new
+  layout is a documented path now, not a refusal.
+- **Repointing pages.** `ALTER PAGE M.P { SET Layout = M.L [MAP (Old AS New, …)]; }` for one, and
+  `ALTER PAGES [IN <module>] SET LAYOUT = M.L [MAP (…)] [WHERE LAYOUT = M.Old]` for a migration.
+  A page bound to a placeholder the new layout lacks is refused by name, with the rebind to write.
+- **`DROP LAYOUT`**, which warns about pages still bound to it.
+
+### What did NOT move, re-checked on v0.26
+
+- **Nothing renames a layout.** `mxcli rename --help` lists eleven types and layout is not among
+  them; `RENAME` in MDL accepts nine document targets plus `MODULE`, also without layout. §22's
+  first bullet stands in full, including the consequence: a layout copied in Studio Pro keeps its
+  `<Name>_2` name until a person renames it, because that is the only thing that moves the
+  references with it.
+- **A rewrite is still lossy, and mxcli says so itself** — from `mxcli syntax layout alter`:
+  *"Prefer ALTER over CREATE OR REPLACE for a layout you did not author: a rewrite is only as
+  complete as its describe."* The v0.26 round-trip fixes are listed for **pages, navigation and
+  microflows**; layouts are not named among them. So §22's closing paragraph holds: `alter` edits
+  in place and leaves the rest byte-identical, a rewrite drops what describe did not reach
+  (`Forms$SidebarToggleButton` among them). Prefer `alter`.
+- **Marketplace modules.** `ALTER LAYOUT` now **refuses a Marketplace target outright**, and
+  `ALTER PAGES` skips Marketplace pages and names them. This is a real improvement on v0.24, where
+  the failure was silent widget loss, but it does not change the routing: a Marketplace layout is
+  still a person's job.
+- **The MCP still has no layout document type.** Nothing in either release touches that; §22's
+  probe (`Pages$Layout` and `Forms$Layout` unknown, `pg_read_page` answers `Page not found`) was
+  against the Studio Pro backend, not mxcli, and only a Studio Pro release can change it.
+
+### Downgraded from "refused" to "unverified": the layout-grid column
+
+§22 recorded `alter layout … drop widget col3` answering `widget "col3" not found`. The spelling
+has changed — it is `DROP col3` now, inside the braces, and it takes a list. **The old error
+message is therefore no longer evidence about the new statement.** This is not a claim that it
+works; it is a claim that the measurement expired. Try it, and record the answer here.
+
+### Two other v0.26 changes this toolkit should act on
+
+- **Documents an older mxcli wrote may be unmergeable in Studio Pro** (mxcli#1373). Mendix's merge
+  and diff engine compares an element's property names between revisions and throws *"Objects with
+  ID … do not …"* when they differ; a key mxcli left out, or wrote for a newer version, broke that
+  the first time Studio Pro saved the document — while `mx check`, the build and the runtime all
+  stayed green. Every v0.26 write now emits Studio Pro's full property set for the project's
+  Mendix version, and **`mxcli fix property-sets -p app.mpr [--dry-run]`** repairs units already
+  written. It reports 0 units on a project Studio Pro authored. Any app this toolkit has written
+  to with mxcli ≤ 0.25 is worth a `--dry-run`.
+- **Concord has come out of the dark.** §18 found `DROP` failing with *"delete_document requires
+  the Concord MCP server — pass `--mcp-concord`"* and recorded Concord as real but undocumented.
+  It is now in `mxcli --help`: `--mcp-concord <url>` for a second server supplying delete, save,
+  validate and run, with `--mcp-save`, `--mcp-check` and `--mcp-run` on top of it. **`--mcp-save`
+  is the one that matters here** — the built-in server has no save tool, and that single gap is
+  what makes §1's loop unclosable and puts "a person saves" into §15's five steps. No Concord
+  server is configured in this setup, so whether it closes that gap is **unverified**. It is the
+  highest-value thing left to probe in this file.
 
 ## Status of this run — complete
 
