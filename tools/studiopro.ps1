@@ -17,8 +17,8 @@
   Every subcommand here therefore resolves the PID from the lock file of the
   project it was given, and touches nothing else.
 
-  Before closing, the holder's window title is checked against the app name as a
-  SECOND opinion — not as the key. A title cannot tell two copies of the same app
+  Before closing, the holder's window title is checked against the app's NAMES as
+  a SECOND opinion — not as the key. A title cannot tell two copies of the same app
   apart, which is why the lock file stays the key, but it does tell two DIFFERENT
   apps apart, and that is the case this guards: a stale lock whose PID has been
   reused by another Studio Pro. A title that names a different app stops the
@@ -37,6 +37,13 @@
 
 .PARAMETER Project
   Path to the .mpr (or to the folder containing exactly one).
+
+.PARAMETER AppName
+  Extra name(s) the window title may legitimately use. The .mpr file and the app
+  are NOT always named the same thing — a project cloned as "<App>-main" whose
+  .mpr kept an older product name is normal, and the title follows the app, not
+  the file. The script already derives candidates from the filename and the
+  folder; pass this when neither matches what Studio Pro shows.
 
 .EXAMPLE
   pwsh -File studiopro.ps1 status "C:\...\MyApp\MyApp.mpr"
@@ -57,7 +64,10 @@ param(
 
   # Close: how long to wait for the process to exit after WM_CLOSE. A clean close
   # measured 1.5s; anything past a few seconds means a dialog is up.
-  [int]$CloseTimeoutSec = 60
+  [int]$CloseTimeoutSec = 60,
+
+  # Names the window title may use besides the ones derived from disk.
+  [string[]]$AppName = @()
 )
 
 Set-StrictMode -Version Latest
@@ -102,10 +112,49 @@ function Get-Holder([string]$mpr) {
 # title at all — both are 'unknown', and both still belong to this project per the
 # lock file. Never promote this to an identity test: two copies of the same app
 # produce the same title, which is the whole reason the lock file is the key.
-function Test-HolderTitle([string]$title, [string]$app) {
+# The app part of "App (Main line ('main'), Git)". Everything Studio Pro appends
+# is parenthesised, so the name is what precedes the first " (".
+function Get-TitleApp([string]$title) {
+  $t = $title
+  $i = $t.IndexOf(' (')
+  if ($i -gt 0) { $t = $t.Substring(0, $i) }
+  return $t.Trim()
+}
+
+# Every name this project may legitimately answer to.
+#
+# The .mpr filename is NOT the app name. Measured on a real project: the file is
+# ArgoERP.mpr, the folder is CleanERP-main, and Studio Pro titles the window
+# "CleanERP (Main line ('main'), Git)" — the app was renamed and the file kept the
+# old name. Deriving the name from the filename alone made the veto below fire on
+# the project's own window, so status and close refused on every call while open
+# worked fine, which reads like a stale lock and is not one.
+function Get-AppNames([string]$mprPath, [string[]]$extra) {
+  $names = New-Object System.Collections.Generic.List[string]
+  $names.Add([System.IO.Path]::GetFileNameWithoutExtension($mprPath))
+  $folder = Split-Path -Leaf (Split-Path -Parent $mprPath)
+  if ($folder) {
+    $names.Add($folder)
+    # A clone is routinely "<App>-<branch>". Strip only branch-shaped suffixes:
+    # a generic "last hyphen wins" would turn Some-App into Some.
+    $trimmed = $folder -replace '-(main|master|develop|development|trunk|git)$', ''
+    if ($trimmed -and $trimmed -ne $folder) { $names.Add($trimmed) }
+  }
+  foreach ($e in $extra) { if ($e) { $names.Add($e) } }
+  return @($names | Where-Object { $_ -and $_.Trim().Length -ge 3 } | Select-Object -Unique)
+}
+
+function Test-HolderTitle([string]$title, [string[]]$apps) {
   if ([string]::IsNullOrWhiteSpace($title)) { return 'unknown' }
   if ($title -eq 'Mendix Studio Pro') { return 'unknown' }
-  if ($title.IndexOf($app, [StringComparison]::OrdinalIgnoreCase) -ge 0) { return 'match' }
+  $titleApp = Get-TitleApp $title
+  if ([string]::IsNullOrWhiteSpace($titleApp)) { return 'unknown' }
+  foreach ($a in $apps) {
+    # Both directions: the title may name the app ("CleanERP") while the folder
+    # names the clone ("CleanERP-main"), or the reverse.
+    if ($titleApp.IndexOf($a, [StringComparison]::OrdinalIgnoreCase) -ge 0) { return 'match' }
+    if ($a.IndexOf($titleApp, [StringComparison]::OrdinalIgnoreCase) -ge 0) { return 'match' }
+  }
   return 'other'
 }
 
@@ -127,7 +176,7 @@ function Get-OpenCommand {
 }
 
 $mpr = Resolve-Mpr $Project
-$app = [System.IO.Path]::GetFileNameWithoutExtension($mpr)
+$apps = Get-AppNames $mpr $AppName
 
 switch ($Action) {
 
@@ -135,8 +184,9 @@ switch ($Action) {
     $h = Get-Holder $mpr
     if (-not $h.LockExists)      { Write-Output "closed: no lock file"; exit 0 }
     if ($h.Stale)                { Write-Output "STALE LOCK: $($h.Lock) names pid $($h.ProcessId), which is not a running Studio Pro."; exit 3 }
-    if ((Test-HolderTitle $h.Title $app) -eq 'other') {
-      Write-Output "WRONG HOLDER: $($h.Lock) names pid $($h.ProcessId), whose window is '$($h.Title)' - that does not name $app."
+    if ((Test-HolderTitle $h.Title $apps) -eq 'other') {
+      Write-Output "WRONG HOLDER: $($h.Lock) names pid $($h.ProcessId), whose window is '$($h.Title)' - that names none of: $($apps -join ', ')."
+      Write-Output "If that window IS this project, pass its name: -AppName '<name>'."
       Write-Output 'Most likely a stale lock whose pid was reused by another Studio Pro. Do not close it.'
       exit 3
     }
@@ -199,8 +249,9 @@ switch ($Action) {
     # ProcessName guard passes that happily — the title is what separates two
     # apps. Refuse rather than guess: being wrong here closes a window someone
     # else is working in.
-    if ((Test-HolderTitle $h.Title $app) -eq 'other') {
-      Write-Output "WRONG HOLDER: $($h.Lock) names pid $($h.ProcessId), whose window is '$($h.Title)' - that does not name $app."
+    if ((Test-HolderTitle $h.Title $apps) -eq 'other') {
+      Write-Output "WRONG HOLDER: $($h.Lock) names pid $($h.ProcessId), whose window is '$($h.Title)' - that names none of: $($apps -join ', ')."
+      Write-Output "If that window IS this project, pass its name: -AppName '<name>'."
       Write-Output 'That is almost certainly a stale lock whose pid was reused by another Studio Pro, and'
       Write-Output 'closing it would close an unrelated project. Leave it for the developer to judge.'
       exit 3

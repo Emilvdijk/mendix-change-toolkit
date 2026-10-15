@@ -278,13 +278,28 @@ holding this project. **Never `taskkill`, never `Stop-Process`, and never pick a
 two Studio Pros on two copies of the same app have the identical title, so a title match will
 eventually close someone's unsaved work (§27 of `WRITING-TO-THE-MODEL.md`).
 
-Before closing, it also checks the holder's window title against the app name — not as the key (two
-copies of the same app share a title) but as a veto: a lock whose pid now belongs to a Studio Pro
-showing a *different* app is refused rather than closed.
+Before closing, it also checks the holder's window title against the app's names — not as the key
+(two copies of the same app share a title) but as a veto: a lock whose pid now belongs to a Studio
+Pro showing a *different* app is refused rather than closed.
+
+**The `.mpr` filename is not necessarily the app name.** Measured on a real project: the file is
+`<OldProduct>.mpr`, the folder is `<App>-main`, and Studio Pro titles the window `<App> (Main line
+('main'), Git)` — the app had been renamed and the file kept the old name. The script therefore
+accepts the filename, the folder name, and the folder with a trailing `-main`/`-master`/`-develop`/
+`-trunk` stripped. If none of those is what the window shows, say so and pass it:
+
+```bash
+powershell ... studiopro.ps1 status "<path>" -AppName "<name in the title>"
+```
+
+An exit 3 whose message reads `that names none of: ...` is this, not a stale lock — the window named
+in it is almost certainly your own project under a different name. Report which names it tried
+before concluding anything about the lock.
 
 Exit 0 is success. **Exit 2 means it did not close, which is a dialog waiting for a person — say so
-and stop; do not force it.** Exit 3 means the lock and reality disagree — a stale lock, or one
-pointing at another app's window — and that is theirs to judge, not yours to clean up. An open takes
+and stop; do not force it.** Exit 3 means the lock and reality disagree — a stale lock, one pointing
+at another app's window, or the naming case above — and that is theirs to judge, not yours to clean
+up. An open takes
 about 20 seconds and a close about 2, so check `status` afterwards rather than assuming.
 
 If your brief does not grant it, ask in one line and wait, exactly as for the gates above.
