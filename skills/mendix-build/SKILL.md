@@ -9,8 +9,16 @@ description: Build a planned Mendix change into the local model — create the d
 You are executing a plan, not writing one. If the plan is wrong, say so and stop — do not
 improvise a different design.
 
-Read `WRITING-TO-THE-MODEL.md` and `MODEL-READING.md` in the toolkit root before starting. They
-are the measured capability map, and every rule below comes from a failure recorded in them.
+`WRITING-TO-THE-MODEL.md` and `MODEL-READING.md` in the toolkit root are the measured
+capability map, and every rule below comes from a failure recorded in them. **Read the section
+index at the top of each, then the sections you need — not the whole file.** Measured on one build
+session: a single full read of WRITING-TO-THE-MODEL cost 1.4M cache-read tokens, because a result
+read early is paid for again by every model call after it, and the two documents together were a
+third of that run's entire re-read cost.
+
+Both indexes give line numbers into their own file, so `sed -n '643,700p' WRITING-TO-THE-MODEL.md`
+is one section. The ones nearly every build needs are §1 (what no tool can do), §18 (why mxcli and
+the MCP alternate) and §15 (the steps that need a person). Read more when a step surprises you.
 
 `OPEN-QUESTIONS.md` sits beside them and is the other half: what the toolkit asserts WITHOUT
 having measured it. Read it when a step depends on a capability rather than on this model. The
