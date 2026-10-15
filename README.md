@@ -38,6 +38,11 @@ rather than being installed:
 Last verified against **mxcli v0.24.0** and **mxlint v3.18.0** on Mendix 11.12.4, reading
 2026-10-02 and writing 2026-10-06.
 
+**[OPEN-QUESTIONS.md](OPEN-QUESTIONS.md) is the register of what this toolkit has
+NOT established** — one row per unverified claim, with what would settle it. Every ⚠️ in
+the other documents points at a row. Read it before trusting a capability statement, and
+add a row whenever a run says it could not check something.
+
 > **The installed mxcli is v0.26.0** (built 2026-10-11, in use here from 2026-10-13). Nothing in
 > this toolkit has been re-measured on it. What is known to have moved — layouts above all, which
 > are no longer a person's job — is in §33 of [WRITING-TO-THE-MODEL.md](WRITING-TO-THE-MODEL.md),

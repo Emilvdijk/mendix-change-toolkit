@@ -85,6 +85,11 @@ than one that discovers it at the last step. Say it in **Approach**, not only in
 Without the MCP, infer it: a module you did not write and that appears in the Marketplace section
 of the project is almost certainly read-only. Say the check could not be made.
 
+**"The check could not be made" is not a throwaway line — it is a row in
+`OPEN-QUESTIONS.md`.** Write it so it can be lifted: what you could not establish, what you assumed
+instead, and what would settle it. Two plans in a row have carried an unchecked writability
+assumption; each said so honestly and each said it somewhere nobody went back to.
+
 ## Step 1 — start from the scout report
 
 If a scout report for this story exists you will be told its path. **Read it first.** It carries

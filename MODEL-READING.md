@@ -13,7 +13,8 @@ returns, measured, and which to reach for. Nothing here is taken from a help tex
 > specification, and re-probe before trusting it on a different version.
 >
 > **The installed mxcli is now v0.26.0** (built 2026-10-11), two releases past everything measured
-> below. The layout findings in particular have moved — see §33 of `WRITING-TO-THE-MODEL.md`,
+> below. Which claims are known to be in doubt is tracked in
+> [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md) — rows 5, 6 and 10 are this file's. The layout findings in particular have moved — see §33 of `WRITING-TO-THE-MODEL.md`,
 > which also states what in them expired rather than reversed. Nothing in this file has been
 > re-measured on v0.26.
 

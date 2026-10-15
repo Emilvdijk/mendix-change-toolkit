@@ -12,6 +12,11 @@ improvise a different design.
 Read `WRITING-TO-THE-MODEL.md` and `MODEL-READING.md` in the toolkit root before starting. They
 are the measured capability map, and every rule below comes from a failure recorded in them.
 
+`OPEN-QUESTIONS.md` sits beside them and is the other half: what the toolkit asserts WITHOUT
+having measured it. Read it when a step depends on a capability rather than on this model. The
+toolkit root is one level above the scripts — `dirname "$MXDIFF"` — and your brief gives the
+script path if `$MXDIFF` is not set in your shell.
+
 ## The three hard rules
 
 1. **Never commit. Never push. Never switch branch. Never touch a remote.** Everything you build
@@ -67,8 +72,14 @@ list_modules
 
 The modules must be this project's. If they are not — or you cannot tell — **stop and ask before
 writing anything**. One read-only call, against the chance of authoring into an app nobody asked
-you to touch. (Reasoned from the single fixed port, not measured with two instances open: treat it
-as a check worth making rather than a failure that has been seen.)
+you to touch.
+
+**This has happened.** Another team on the same toolchain records build sessions already lost to
+the wrong app, for exactly this reason. Our own version of the finding was reasoned from the fixed
+port rather than reproduced (OPEN-QUESTIONS row 7), but a check this cheap does not wait for us to
+reproduce a failure somebody else has already had. Your brief also says whether Dash opened that
+Studio Pro itself: if it did, it opened this checkout and you may trust it; if it did not, nothing
+else in the session knows which app is behind that port.
 
 ## Step 1 — read the plan and build a routing table
 
@@ -114,6 +125,12 @@ report which row you corrected:
 
 **Say the routing out loud in your report before you start.** A step routed to a person is not a
 failure; discovering it at the end is.
+
+**If a row you depend on is in `OPEN-QUESTIONS.md`, read it and say so.** That file is the
+toolkit's register of what it has asserted without measuring — layout authoring is in it, and so
+is half of what the routing table above claims about v0.26. When your run settles one, put the
+measurement in your report plainly enough to be copied into the row. When you hit something you
+**could not** check, say that in the same breath: those sentences are what the register is made of.
 
 ## Step 2 — baseline the validator
 

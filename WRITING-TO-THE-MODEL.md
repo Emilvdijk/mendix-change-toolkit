@@ -14,6 +14,10 @@ hours without the MCP tools and nobody noticed until the report — see §31.
 Everything here was measured during the run. Where a published capability list disagrees with
 what the server did, the server wins and the disagreement is recorded.
 
+**What is NOT measured is in [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md), one row each.** §33 is the
+largest contributor to it: that section is read out of the tool rather than measured, and rows 1–4
+and 8 are its. Close a row there when a run settles it, and move the measurement into this file.
+
 **Status: the feature was built and runs.** Nine model documents plus CSS, authored by an agent
 across both write paths, with a person doing the five steps no tool can (§15). The app starts
 without error and the widget works.
