@@ -35,6 +35,30 @@ script path if `$MXDIFF` is not set in your shell.
 3. **Stop at a human gate and report.** Do not work around it, do not approximate it, do not
    silently skip the steps that depend on it.
 
+## Spend the context like money
+
+Every model call re-reads the whole context, so a call costs what the context weighs however
+small the thing it does. Measured on a 48-call build run: 4.8M tokens of cache-read against 31k
+of output, 101k a call — and a tool result is charged again by every call after it, so 26k of
+raw tool output cost 879k in re-reads, 34x each. Three rules follow, and none of them costs you
+anything:
+
+- **`node`, never `python`.** On Windows `python` and `python3` resolve to the Microsoft Store
+  alias stubs: they are on `PATH`, so they look installed, and then they fail with *"Python was
+  not found"*. One such call cost 62k — the fourth costliest result in that run — for a command
+  that never executed, plus the retry behind it. `node -e` and `node script.mjs` are always
+  there; the toolkit's own tools are written in it.
+- **Fetch each `mxcli syntax` page once.** Static text, 1.1-1.5k tokens a page, and every later
+  call pays for it again: three pages came to 142k in that run and two had been fetched twice.
+  If you need one again, scroll back — it is still in your context, which is why it is costly.
+- **Read the expensive things late.** A result arriving at call 2 is paid for 46 more times; the
+  same bytes at call 40 are paid for 8. Orient with the cheapest thing that answers the question
+  and pull the long `describe` only when you are about to use it.
+
+`mxcli diag session-report <transcript.jsonl>` prints this breakdown for a finished session. It
+is what produced the numbers above, and it ranks results by size x the calls that re-read them,
+which is the number that matters.
+
 ## Step 0 — orient, and refuse early if you must
 
 ```bash
@@ -156,6 +180,37 @@ For each numbered step of the plan, in order:
 
 Use a quoted heredoc (`<<'EOF'`). Never an interpolating one, never a script that re-escapes the
 content. `$` is load-bearing in MDL (`$currentObject`, `$Variable`) and in every shell.
+
+**Lay the flow out in the same script. A microflow is read far more often than it is run.**
+
+Two conventions, both `@` annotations from `mxcli syntax microflow.layout`, both authored in the
+`CREATE` or `ALTER` that builds the flow rather than tidied afterwards:
+
+- **A long condition gets a short caption.** `@caption 'text'` on an `IF` is what the decision
+  shows on the canvas. Leave it off and Studio Pro draws the whole expression inside the
+  diamond, so a three-clause condition becomes a shape nobody can read at normal zoom. The
+  expression stays exact; the caption is for a person.
+- **Only the happy path goes right. Every other outcome goes straight down.** Anchor the branch
+  that carries the main line `(from: right, to: left)` and the rest `(from: bottom, to: top)`,
+  so they drop into the lane below and run down until they meet a merge or the next decision.
+  Diagonals are what you get when the anchors are left to chance, and a canvas of them cannot be
+  read at a glance.
+
+```sql
+IF $Request/Status = Pending AND $Request/Attachment != empty AND $User/Active THEN
+  @caption 'Ready to attach?'
+  @anchor(true: (from: right, to: left), false: (from: bottom, to: top))
+```
+
+`@anchor` has a per-branch form; `@curve` does not — on a split it bends every outgoing edge and
+`@curve(true: ...)` is refused (MDL060) — so shape branches with anchors, never with curves. An
+annotation mxcli does not recognise is refused rather than ignored (`@captionn` gives MDL059, an
+anchor side it cannot place gives MDL092), so the dry run in 3c tells you whether the names are
+right. It does not tell you how it looks: that needs eyes on the canvas.
+
+Leave `@position` alone unless you are placing every statement. The builder lays the canvas out
+by itself, and the grammar is blunt about the half-measure — *"Prefer no @position at all to a
+few"* — because a hand-placed statement is never moved to fit what gets built around it.
 
 **3b. Grep the file for what matters, before running it.**
 
