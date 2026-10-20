@@ -51,8 +51,8 @@ add a row whenever a run says it could not check something.
 
 **[MODEL-READING.md](MODEL-READING.md) is the capability matrix** — mxcli vs mxlint vs the
 Studio Pro MCP vs raw BSON, measured on the same documents, with the sizes. Read it before
-deciding which tool answers a question; these tools' blind spots have moved between releases and
-two moved between mxcli v0.16 and v0.24.
+deciding which tool answers a question; these tools' blind spots have moved between releases —
+two between mxcli v0.16 and v0.24, and eight more between v0.24 and v0.26.
 
 **[WRITING-TO-THE-MODEL.md](WRITING-TO-THE-MODEL.md) is the same thing for writes** — field notes
 from instrumented write runs, each dated: what the MCP and mxcli can each author, the steps that
@@ -61,9 +61,13 @@ and corrects itself where a later run disproves an earlier conclusion, so read t
 than assuming it settled. `mendix-build` reads it before it starts, and so should anyone trusting
 a claim about what an agent can author.
 
-The short version: **mxcli reads everything** and is the default. The **Studio Pro MCP** supplies
-one short list of flags mxcli cannot render at all (`commit`, `refreshInClient`,
-`errorHandlingType`, `allowedModuleRoles`, `applyEntityAccess`) and is useless for anything else.
+The short version: **mxcli reads everything** and is the default — and since v0.26 that includes
+the document and per-activity flags it used to miss entirely: `commit`, `refreshInClient`,
+`errorHandlingType`, `allowedModuleRoles`, `applyEntityAccess`, `allowConcurrentExecution`,
+`excluded` and `documentation` all arrive in the MDL it prints. The **Studio Pro MCP** is now
+needed for one short residue — `markAsUsed`, a log activity's `includeLatestStackTrace`, and a
+few REST and import-mapping settings — plus the things that are not model reads at all: Studio
+Pro's own consistency check, the Mendix knowledge base, the live (unsaved) state, and writing.
 **mxlint** is what `build-history.sh` replays to make commits diffable.
 
 **mxlint must be 3.17 or newer.** The git-backed modelsource workflow (`init`, `commit`,
@@ -286,11 +290,16 @@ Found by testing, not assumed:
   tree, so whether its diff is correct on a dirty one is untested — the scripts below remain the
   trusted path, but this is worth re-evaluating.
 - **`mxcli describe module X` does not dump module contents** despite its help text; it emits
-  only `create module X;` plus the module roles. MDL is per-document. (Still true on v0.24.0.)
-- **mxcli cannot show `commit`, `refreshInClient`, `errorHandlingType`, `applyEntityAccess` or
-  `allowedModuleRoles`** in any output format — `-f json` only wraps the same MDL string. These
-  decide whether a change persists and who may run it, so they have to come from mxlint's YAML
-  or the Studio Pro MCP. See [MODEL-READING.md](MODEL-READING.md).
+  only `create module X;` plus the module roles — 79 bytes for a module of 8 microflows. MDL is
+  per-document. (Still true on v0.26.0.)
+- **mxcli NOW SHOWS the flags it used to omit.** On v0.24 `commit`, `refreshInClient`,
+  `errorHandlingType`, `applyEntityAccess` and `allowedModuleRoles` appeared in no output format.
+  **Re-measured on v0.26.0, 2026-10-20: every one of them renders as MDL** — `change $X (…)
+  commit refresh;`, `… on error without rollback begin … end error;`, `@applyentityaccess`,
+  `grant execute on microflow … to …;`, and alongside them `disallow concurrent execution`,
+  `@excluded` (document *and* activity) and `/** … */` for documentation. `markAsUsed` is the one
+  document flag with no MDL clause at all. Do not route a read to the MCP or to mxlint for these.
+  See [MODEL-READING.md](MODEL-READING.md) §6 for what each looks like and where it was measured.
 - **Multi-clause XPath truncation is FIXED** as of v0.24.0. Older notes warning that mxcli drops
   every clause after the first no longer apply; both clauses render.
 - **mxlint drops `Flows:` entirely** — sequence-flow edges are ID-based and IDs are stripped.

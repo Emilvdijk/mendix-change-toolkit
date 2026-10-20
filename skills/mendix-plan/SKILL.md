@@ -198,33 +198,50 @@ Two things to know before you trust it:
   default; add `--exclude` for the marketplace modules in this app, or read only the rows in
   modules the team actually writes.
 
-### Ground truth mxcli cannot give you — get it, do not defer it
+### Ground truth — most of it is in the describe you already ran
 
-mxcli does not show **`AllowConcurrentExecution`**, **`ApplyEntityAccess`**, **`LocalizeDate`**,
-commit/refresh-in-client flags, execute-role security, or **page structure** of any kind. Those
-are exactly the things that decide whether a plan is right.
+**Re-measured on mxcli v0.26.0, 2026-10-20.** This section used to send you to the MCP for the
+flags that decide whether a plan is right. Eight of the nine now come out of `mxcli describe`
+itself, as MDL rather than as property names — so look for the keyword, not the field:
 
-(Multi-clause **XPath** used to be on that list. It is not any more — mxcli v0.24 renders every
-clause. Verified 2026-10-02; see `MODEL-READING.md`.)
+| Fact | What it looks like in `describe` |
+|---|---|
+| execute roles | `grant execute on microflow M.D to M.Administrator, M.Editor;` after `end;` — **absent means the list is empty** |
+| `ApplyEntityAccess` | `@applyentityaccess` / `@applyentityaccess(false)` before `create or modify` |
+| `AllowConcurrentExecution` | `disallow concurrent execution error message '...'` in the header; absent = concurrent runs allowed |
+| `Excluded` | `@excluded` before the document, or before a single statement — **an `@excluded` activity does not run** |
+| commit / refresh-in-client | `change $X (...) commit refresh;` — **neither keyword means in-memory**, and the caller must commit |
+| error handling | `on error continue` / `on error rollback` / `on error begin ... end error`; no clause = Mendix's default rollback |
+| documentation | a `/** ... */` block before the statement |
 
-**Studio Pro is open, so take these from the MCP in two calls** and skip the export entirely:
+**Page structure** comes from `mxcli describe page` and always did: a large overview page returns
+57 KB of real widget tree in 3 seconds, where `pg_read_page` returns 211 bytes with every widget
+list elided to `"..."`. Entity access rules likewise come from `mxcli describe entity`, complete
+with the XPath on each grant.
+
+(Multi-clause **XPath** used to be on the missing list too. It is not any more — mxcli v0.24
+renders every clause. Verified 2026-10-02; see `MODEL-READING.md`.)
+
+**What is still not in the describe**, and needs the MCP (`ped_read_document`) if the plan
+actually turns on it:
+
+`markAsUsed` · `includeLatestStackTrace` on a log activity · on a REST call
+`errorResultHandlingType`, `useRequestTimeOut` and the proxy settings · and the import-mapping
+call's own `commit` and `forceSingleOccurrence`. **`LocalizeDate`** is expressible —
+`mxcli syntax domain-model attributes` documents `DateTime not localized` — but whether
+`describe entity` emits it on a non-localized attribute is **not measured**; confirm before
+planning on it.
 
 ```
 ped_read_document { documentType: "Microflows$Microflow", documentName: "<Module>.<Doc>" }
 ped_read_document { ..., paths: ["/objectCollection/objects/<i>/action", ...] }
 ```
 
-The first carries `applyEntityAccess`, `allowedModuleRoles`, `allowConcurrentExecution` and
-`excluded`; the second carries `commit`, `refreshInClient` and `errorHandlingType` per activity.
 Confirm with `list_modules` that the open project is the right one — the MCP reads **whatever
-Studio Pro has open**, never a commit, and says nothing if that is a different project.
+Studio Pro has open**, never a commit, and says nothing if that is a different project. It is
+also the only reader that sees **unsaved** work, which is the other reason to call it.
 
-**For page structure use `mxcli describe page`, not the MCP.** Measured on
-a large overview page: mxcli returns the real 90 KB widget tree in one call, `pg_read_page`
-returns 211 bytes with every widget list elided to `"..."`. Entity access rules likewise come
-from `mxcli describe entity`, complete with the XPath on each grant.
-
-Export only if Studio Pro turns out to be closed.
+Export with mxlint only if Studio Pro turns out to be closed AND you need the residue above.
 
 **For a Bug, getting these facts is mandatory, not optional** — by whichever route — and so is
 reading the page structure. Writing "verify this in Studio Pro" instead of running one command is
@@ -362,7 +379,8 @@ So write:
 7. Grant execute on `Module.DS_Thing` to `Module.Administrator` AND `Module.User`.
    `DS_Other` grants only `Module.User` — do not copy that pattern, it hides the feature
    from admins.
-   Check: Studio Pro error list is clean, or `ped_read_document` shows two allowedModuleRoles.
+   Check: `mxcli describe microflow Module.DS_Thing` ends with a `grant execute on microflow`
+   line naming both roles.
 ```
 
 not:
@@ -372,8 +390,10 @@ not:
 ```
 
 **The `Check:` line matters as much as the instruction.** Pick a check the executing agent can
-actually run, and name the tool — mxcli cannot see allowed roles, commit flags or error state, so
-a `Check:` that says `mxcli describe` for any of those is unrunnable. See `MODEL-READING.md` for
+actually run, and name the tool. On mxcli v0.26 `mxcli describe` IS a runnable check for allowed
+roles, commit flags and error handling — name the MDL the check should find (`grant execute on
+microflow …`, `commit`, `on error …`), not the property name, because the property name does not
+appear. Reserve `ped_read_document` for the residue listed above. See `MODEL-READING.md` for
 which reader sees which fact, and `WRITING-TO-THE-MODEL.md` §14 for what happens when a plan's
 checks are skipped.
 
