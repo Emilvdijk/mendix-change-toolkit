@@ -196,6 +196,11 @@ destructive operations in a call of their own so a failure elsewhere cannot half
 Also: *"After running ped_check_errors, YOU GET TO UPDATE THE DOCUMENT EXACTLY ONCE. After that,
 if there are still errors, report them and STOP."* One fix attempt, then stop.
 
+**There is a second exception, found later and worse: a call that times out.** Everything above is
+about a call that *returned a failure*, and those are clean. A call that returns nothing has an
+unknown outcome — Studio Pro may finish it minutes after the client gave up. Never resend one
+(§34).
+
 ## 8. What the plan got right, and what it could not know
 
 The plan for this story was written by `mendix-plan` with a note telling it the output would be
@@ -253,6 +258,9 @@ nobody made.
 3. Confirm the document does not already exist. Not with `ped_find_document` if it is a domain
    model (§6.4).
 4. Write. Batch independent `add`s; isolate anything destructive (§7).
+   **If it times out or returns nothing, stop here.** Do not send it again: the outcome is
+   unknown, not failed, and a retry races the call still running (§34). Ask a person to look at
+   the document in Studio Pro.
 5. Re-read what you wrote with `ped_read_document`. Do not assume `SUCCESS` means the result
    matches the intent — it means the operations applied (§9).
 6. `ped_check_errors` again. Compare against the baseline from step 2.
@@ -1195,6 +1203,80 @@ works; it is a claim that the measurement expired. Try it, and record the answer
   what makes §1's loop unclosable and puts "a person saves" into §15's five steps. No Concord
   server is configured in this setup, so whether it closes that gap is **unverified**. It is the
   highest-value thing left to probe in this file.
+
+## 34. A timed-out MCP call may still be applied, and retrying it corrupted a page
+
+The biggest page in the project — 6.8 MB, about 31,000 objects — needed one property changed that
+mxcli cannot author, so it was routed to `pg_patch_page`. The call returned `Request timed out`.
+It was sent again. Studio Pro's own log shows what the client could not:
+
+```
+10:16:51 ERROR Unexpected error while handling request to /model/query
+         System.Threading.SynchronizationLockException: Could not acquire a lock within the given timeout
+            at Mendix.Modeler.Undo.UndoManager.Lock(...)
+            at Mendix.Modeler.WebEditors.WebEditorWriter.WriteObjectContents(...)
+10:16:51 WARN  MCP: received mcpResponse with unknown messageId '30312196-…'
+10:17:13 WARN  MCP: received mcpResponse with unknown messageId 'c6452ac9-…'
+10:18:43 ERROR  (the same lock timeout on /model/query)
+10:18:43 WARN  MCP: received mcpResponse with unknown messageId '0e323299-…'
+10:19:06 WARN  MCP: received mcpResponse with unknown messageId '07b23bc6-…'
+```
+
+Two facts, both from the log rather than inferred:
+
+- **Serialising this page cannot get the undo lock.** `/model/query` is the web-editor read
+  channel, and it failed because something else held `UndoManager`. On a page this size the
+  serialisation outlasts the lock's patience, so calls against it fail by contention, not by
+  anything being wrong with the call.
+- **"Unknown messageId" means Studio Pro answered a request the client had already abandoned.**
+  The timeout lives in the client. The modeler kept working, finished, and replied into a void.
+
+Studio Pro saved the project at 11:50. The page was corrupt and had to be reverted to `HEAD`. No
+copy of the corrupt version survives, so the exact damage cannot be shown — the mechanism can.
+That a retry double-applied remains **inference**; that a retry stacked a second write behind one
+still running, against a document that was already losing a lock fight, is not.
+
+### Confirmed deliberately on the repair run
+
+The same step was redone. One `pg_patch_page` was sent and **not** retried. It returned
+`Request timed out`, and at that moment the log held nothing for it and the page on disk was
+byte-identical to the mxcli version. About a minute later:
+
+```
+14:19:11 WARN  MCP: received mcpResponse with unknown messageId 'a80b47cb-…'
+```
+
+One call, no retry, and it still completed late. That is the finding in a line: **a timeout tells
+you nothing about whether the change was made.**
+
+### The rule
+
+**Never resend an `mcp__mendix__*` call that timed out or came back empty.** Not once. A retry is
+not a second attempt at the same change; it is a second change, racing the first, against a
+modeler that is already too busy to answer.
+
+Do not take the opposite lesson either. A timed-out call has an **unknown** outcome, not a failed
+one:
+
+- Do not resend it.
+- Do not continue as though the change did not happen.
+- Do not save, and send no further write to that document.
+- Say what you sent, say it timed out, say the state is unknown, and **ask the person at the
+  keyboard to open the document in Studio Pro and look.** They can see in one glance what nothing
+  in this toolchain can read: whether the change is in the model. In a headless run there is
+  nobody to ask, so stop at that document and record it in the report.
+
+This is where §7 stops applying. A validation failure leaves the model untouched and says so. A
+timeout is not a validation failure and leaves nothing known at all.
+
+### How not to get there
+
+- **Route a property change on a very large page to a person, not to the MCP.** Setting one
+  dropdown by hand takes seconds. Timing it out on a 6.8 MB page cost a revert and a rebuild.
+- Check the unit's size before patching it: `ls -l` on its file under `mprcontents/`. There is no
+  published threshold. 6.8 MB timed out every time; ordinary pages do not time out at all.
+- Give mxcli everything on that page it can author. It writes the unit with Studio Pro closed, so
+  there is no undo lock to contend for and nothing to serialise.
 
 ## Status of this run — complete
 

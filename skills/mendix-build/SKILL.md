@@ -276,6 +276,25 @@ failure leaves earlier statements applied. Put the risky statement first, or run
 MCP: batch independent `add` operations freely; **never batch a `remove` or a rename with
 anything else**, because those can leave side effects even when the call fails.
 
+**If an MCP call times out or comes back with nothing, that call is finished. Never send it
+again.** A timeout is the client giving up, not the modeler stopping: Studio Pro's log shows it
+answering requests minutes after the client abandoned them (`MCP: received mcpResponse with
+unknown messageId`). A resend therefore queues a second change behind one that is still running.
+Done three times on a 6.8 MB page, it left the page corrupt and it had to be reverted (§34).
+
+So a timeout leaves the outcome **unknown**, not failed, and you cannot resolve it from here:
+
+- Do not resend it, and do not carry on as if the change did not happen.
+- Send no further write to that document, and do not ask for a save.
+- Say what you sent, say it timed out, say the state is unknown, and **ask the developer to open
+  that document in Studio Pro and tell you what it shows.** One look settles what no tool in this
+  toolchain can read. With nobody at the keyboard, stop at that document and put it in the report
+  under "left for you".
+
+Before patching a big page at all, check its size (`ls -l` on its unit under `mprcontents/`) and
+hand a one-property change on a multi-megabyte page to the developer instead. A dropdown set by
+hand takes seconds; the retry cost a revert.
+
 **3e. Read it back and diff against the plan, field by field.**
 
 `SUCCESS` means the operations applied. It does not mean the result matches the plan. In the
@@ -510,6 +529,8 @@ Specifically, do not assume any of these, all of which held in that run:
 - `SUCCESS` from an MCP write means the result matches the intent.
 - Nothing validates stylesheets. If you write CSS, **grep the theme for every `var(--x)` you
   reference** — an invented custom property is a widget nobody can see, and no gate catches it.
+- A timed-out MCP call did not happen. It is the client that gave up; Studio Pro has been logged
+  answering minutes later. Retrying one corrupted the largest page in a project (§34).
 - The capability summaries are current. `mxcli mcp capabilities` has been wrong twice.
 
 ## Rules
@@ -527,6 +548,9 @@ Specifically, do not assume any of these, all of which held in that run:
 - **Studio Pro stages its own saves.** `git diff --cached` can list files this build never touched —
   a Marketplace import stages its jars. Do not unstage them and do not claim them; report them under
   "changes this build did not make" (§23).
+- **Never resend an MCP call that timed out or returned nothing.** The outcome is unknown, not
+  failed — a retry races the call still running, and three of them corrupted a 6.8 MB page.
+  Stop, say the state is unknown, and ask the developer to look at that document (§34).
 - Only ever author into modules the project owns. Never write a Marketplace module.
 - Never run the app, never deploy, never touch Mendix Cloud.
 - If a step cannot be done, that is a result. Report it and carry on with the steps that do not
