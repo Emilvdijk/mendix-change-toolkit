@@ -288,12 +288,35 @@ paging loop. Put the call in its own microflow, returning the page size, and let
 but add up and decide whether to go round again. `mxcli check` passed the in-loop version; `mx.exe
 check` on the scratch copy caught it with six errors before it reached the project (§29).
 
+**Read its exit code, not just its tail.** `check` exits 1 on a reference error and 0 when clean,
+and on mxcli v0.27 it resolves far more than it used to — ALTER PAGE targets, the flows and pages
+widgets name, access-rule `where` members, entity event handlers, calls to flows the script
+itself creates. Things that used to surface only at `exec` or at build time now surface here.
+
+**A grant in a module this script just created needs the role created too.** Through mxcli v0.26,
+a new document in a role-less module silently got an auto-created `<Module>.User`. v0.27 creates
+nothing, so `grant execute on microflow NewMod.ACT_X to NewMod.User;` fails with *"module role
+NewMod.User does not exist"*. Add `create module role NewMod.User;` (and `.Administrator`) before
+the grant. Modules that already have roles are unaffected — this only bites a module the same
+script creates.
+
 For an MCP write there is no dry run, so re-read the schema instead and build the call carefully.
 
 **3d. Apply.**
 
-mxcli: `mxcli exec <file> -p "<app>.mpr"`. **`exec` is not atomic across statements** — a later
-failure leaves earlier statements applied. Put the risky statement first, or run one per file.
+mxcli: `mxcli exec <file> -p "<app>.mpr"`. **On mxcli v0.27 and later, `exec` is all or nothing** —
+a statement that fails at write time rolls the whole run back and the project is as it was, with
+exit code 1. So do not order statements by risk and do not split a script to isolate a dangerous
+one; both were workarounds for a defect that is fixed. On v0.26 and below they still apply, so
+check `mxcli --version` before you rely on this.
+
+**Read the last line of an `exec`, not the first.** The output still prints every write it made
+before the failure — `Created module: ProbeTwo`, then the error, then `Nothing was written:
+statement 1 was rolled back`. Both lines are true; only the last one is the outcome. A run ends
+either on its statement count or on `Nothing was written`.
+
+Rollback is not verification. It removes the half-applied state; it says nothing about whether
+what *did* apply is what you meant. Step 3e still stands.
 
 MCP: batch independent `add` operations freely; **never batch a `remove` or a rename with
 anything else**, because those can leave side effects even when the call fails.
@@ -553,6 +576,9 @@ Specifically, do not assume any of these, all of which held in that run:
   reference** — an invented custom property is a widget nobody can see, and no gate catches it.
 - A timed-out MCP call did not happen. It is the client that gave up; Studio Pro has been logged
   answering minutes later. Retrying one corrupted the largest page in a project (§34).
+- An `exec` that printed `Created <X>` created `<X>`. On mxcli v0.27 a later statement's failure
+  rolls the whole run back, and those success lines stay in the output above the error. The
+  outcome is the last line, not the first (§35).
 - The capability summaries are current. `mxcli mcp capabilities` has been wrong twice.
 
 ## Rules

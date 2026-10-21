@@ -566,7 +566,7 @@ author meant. Two cheap defences:
 The fix was re-running the same statement with correct escaping, then reading it back — all three
 expressions now carry `$currentObject`, verified rather than assumed.
 
-### `mxcli exec` is not atomic across statements
+### `mxcli exec` was not atomic across statements (fixed in v0.27 — see §35)
 
 The fix script carried two statements. The first applied, the second failed:
 
@@ -578,9 +578,13 @@ Error: microflow not found: SampleApp.ACT_WeatherHelper_ToggleMinimized
 (The grant used `ON MICROFLOW` for a nanoflow; the correct form is
 `GRANT EXECUTE ON NANOFLOW Module.Name TO Module.Role`, which does exist.)
 
-So a failed `exec` can leave a script half-applied — unlike `ped_update_document`, where a failed
-operation applies nothing. **Order statements so the risky one runs first**, or run them
-separately, and never assume a failed `exec` changed nothing.
+So a failed `exec` left a script half-applied — unlike `ped_update_document`, where a failed
+operation applies nothing.
+
+> **Superseded by mxcli v0.27.0 (2026-10-15). `exec` is now all or nothing**, and both halves of
+> this incident are now caught earlier. The rule that replaces this one, with the measurement, is
+> §35. Keep reading this section as history: it is why the rule existed, and the behaviour it
+> describes is the behaviour on v0.26 and below.
 
 ### A documentation failure worth recording
 
@@ -1277,6 +1281,91 @@ timeout is not a validation failure and leaves nothing known at all.
   published threshold. 6.8 MB timed out every time; ordinary pages do not time out at all.
 - Give mxcli everything on that page it can author. It writes the unit with Studio Pro closed, so
   there is no undo lock to contend for and nothing to serialise.
+
+## 35. mxcli v0.27 makes `exec` all-or-nothing, and takes away the auto-created module role
+
+Measured 2026-10-21 on mxcli v0.27.0 (built 2026-10-15), against a scratch copy of a 14-module
+app on Mendix 11.12.4. This section is a probe of the claims this file makes, not a run.
+
+### `exec` rolls back. §16's rule is retired.
+
+A write-time failure now restores the project. mxcli copies the `.mpr` and each unit file it is
+about to touch before its first write, and puts them back if any statement fails.
+
+A two-statement script — create a module, then a statement the project's Mendix version refuses:
+
+```
+Created module: ProbeTwo
+Error: create message definition requires Mendix 11.15.0+ (project is 11.12.4)
+Nothing was written: statement 1 was rolled back, and the project is as it was before exec
+```
+
+`list modules` afterwards did not contain `ProbeTwo`. Exit code 1.
+
+**The trap is in the output, not the behaviour.** mxcli prints `Created module: ProbeTwo` and
+*means it* — that write happened and was then undone. An agent that reads the transcript
+line-by-line and stops at the last success will record a module that does not exist. **Read the
+last line of an `exec`, not the first.** A run either ends on its statement count or on
+`Nothing was written`.
+
+### The rule that replaces §16's
+
+- Stop ordering statements by risk, and stop splitting a script to isolate the dangerous
+  statement. That was a workaround for a defect that is fixed. A script is one unit again.
+- Still **verify by reading the model back**, not by reading exec's output. Rollback removes the
+  half-applied state; it does not tell you the applied state is what you meant.
+- The MCP is unchanged and still has no equivalent. `ped_*` batching advice in §7 stands, as does
+  the timed-out-call rule in §34 — a rollback covers a failure mxcli *saw*, and a timeout is
+  precisely the case where nobody saw anything.
+
+### `check -p` now catches what §16 found at exec time
+
+The grant in §16 used `ON MICROFLOW` for a nanoflow, which only `exec` refused. On v0.27 the same
+script fails `check` with exit code 1:
+
+```
+Reference errors:
+  statement 2: grant execute on microflow SampleApp.ACT_…: microflow SampleApp.ACT_… does not exist
+```
+
+This is the wave described in the release notes — ALTER PAGE targets, access-rule `where`
+members, entity event handlers, image references, calls to flows the script creates. **Run
+`mxcli check <script> -p <app>.mpr` and read its exit code.** It is no longer a syntax pass.
+
+### Breaking: mxcli no longer invents a module role
+
+Through v0.26, creating a page, microflow or nanoflow in a module with no module roles made
+`<Module>.User` ("Auto-created default role for mxcli document access") and granted the document
+to it. v0.27 creates nothing. A new document starts with no allowed roles.
+
+This breaks the pattern this toolkit teaches — "grant execute to `Module.Administrator` and
+`Module.User`" — **whenever the module is one the same script just created**. Measured:
+
+```
+mdl 1;
+create or modify module NewModProbe;
+create or modify microflow NewModProbe.ACT_Probe() … ;
+grant execute on microflow NewModProbe.ACT_Probe to NewModProbe.User;
+```
+
+```
+statement 3: … module role NewModProbe.User does not exist
+```
+
+The fix is one statement: `create module role NewModProbe.User;` before the grant. It fails loudly
+at `check`, so nothing silently ships without security — but a build agent that writes the grant
+from memory and skips `check` will hit it at `exec` instead. Roles an earlier mxcli created are
+left alone, and `create module role M.User` adopts one.
+
+### Two smaller things worth knowing
+
+- **`describe module X --all`** dumps a module's contents, which no version before v0.27 did. 149
+  bytes bare, 18,623 with the flag, on the same module.
+- **`mxcli -c` and the REPL speak `mdl 1`, not `mdl 0`** — since v0.25, not v0.27, and this file
+  never said so. `show entity X` there is now a parse error; `describe entity` / `list entities`
+  are the replacements. **Script files are untouched**: `exec`, `check` and `fmt` read a headerless
+  file as `mdl 0`, so every script in this toolkit runs as written. `describe` emits an `mdl 1;`
+  header, which means a describe → exec round-trip is now explicitly versioned.
 
 ## Status of this run — complete
 

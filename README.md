@@ -289,9 +289,11 @@ Found by testing, not assumed:
   **Re-tested on v0.24.0: it now connects and reports cleanly.** Only checked against a clean
   tree, so whether its diff is correct on a dirty one is untested — the scripts below remain the
   trusted path, but this is worth re-evaluating.
-- **`mxcli describe module X` does not dump module contents** despite its help text; it emits
-  only `create module X;` plus the module roles — 79 bytes for a module of 8 microflows. MDL is
-  per-document. (Still true on v0.26.0.)
+- **`mxcli describe module X` did not dump module contents** despite its help text; it emitted
+  only `create module X;` plus the module roles — 79 bytes for a module of 8 microflows. **Fixed
+  in v0.27.0:** `describe module X --all` returns the lot. Measured 2026-10-21 on a 14-module
+  app: 149 bytes bare, 18,623 bytes with `--all`. The bare form still emits the module and its
+  roles, so nothing that relied on it breaks.
 - **mxcli NOW SHOWS the flags it used to omit.** On v0.24 `commit`, `refreshInClient`,
   `errorHandlingType`, `applyEntityAccess` and `allowedModuleRoles` appeared in no output format.
   **Re-measured on v0.26.0, 2026-10-20: every one of them renders as MDL** — `change $X (…)

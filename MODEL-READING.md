@@ -12,6 +12,10 @@ returns, measured, and which to reach for. Nothing here is taken from a help tex
 > claims in this file to have been wrong rather than merely stale. Treat this as a dated
 > measurement, not a specification, and re-probe before trusting it on a different version.
 >
+> **mxcli v0.27.0 is out and the tables below have not been re-run against it.** What was measured
+> on it, on 2026-10-21, is in §6 under "Changed on v0.27" — including one entry below that it
+> turned from true to false.
+>
 > What is still in doubt is tracked in [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md) — row 10 is this
 > file's, and it is now narrower: everything here is measured on **11.12.4**, nothing on 11.15.
 > The layout findings have moved again; see §33 of `WRITING-TO-THE-MODEL.md`, which states what
@@ -303,6 +307,25 @@ before nor the after. Use it only for questions about the model as it stands rig
 Two re-measures are folded in here: v0.16 → v0.24 on 2026-10-02, and v0.24 → v0.26 on
 2026-10-20. **Do not carry an older note forward from either.**
 
+### Changed on v0.27 — measured 2026-10-21, not a full re-run
+
+mxcli v0.27.0 (built 2026-10-15) was probed only for the claims this toolkit makes. Everything
+else in this file still dates from the v0.26 run. Four things moved, measured on a scratch copy
+of the 14-module app:
+
+| Claim as written here | v0.27 | How it was measured |
+|---|---|---|
+| `describe module X` emits only `create module X;` plus roles | **false** — `describe module X --all` dumps the contents the help text always promised | 149 bytes bare, **18,623 bytes** with `--all`, on the same module (5 entities, 1 page, 5 microflows, 1 nanoflow, 1 constant) |
+| `exec` is not atomic across statements (§16 of `WRITING-TO-THE-MODEL.md`) | **false** — a write-time failure rolls the whole run back | a two-statement script whose second statement is version-refused: exec printed `Created module: ProbeTwo`, then `Nothing was written: statement 1 was rolled back, and the project is as it was before exec`; `list modules` afterwards showed no ProbeTwo. Exit code 1 |
+| `mxcli search` searches string literals only | **narrower than that** — documentation is indexed now | `search "Confetti"` returned a JavaScript action matched on `StringContext: documentation`. The `CATALOG.SOURCE is not built` warning is unchanged: flow bodies and expressions still need `refresh catalog full source` |
+| (never stated here) `mxcli -c` and the REPL speak the same language as a script file | **false since v0.25** — they default to `mdl 1` | `mxcli -c "show entity SampleApp.Customer"` is a parse error naming `describe entity` / `list entities` as the replacements. `list entities`, `show modules` and `show snippets` still run. **Script files are unaffected** — `exec`, `check` and `fmt` read a headerless file as `mdl 0` — and `describe` now writes an `mdl 1;` header, so its own output round-trips |
+
+Two further v0.27 changes are not measured in this file but bear on writing, and are recorded in
+`WRITING-TO-THE-MODEL.md` §35: mxcli no longer invents a `<Module>.User` role, which breaks a
+grant in a module the same script just created, and `check -p` resolves far more references than
+it did — it now catches at check time the exact `GRANT EXECUTE ON MICROFLOW` / nanoflow mismatch
+that §16 found only at exec time.
+
 ### Closed on v0.26: eight of mxcli's nine missing flags
 
 §2 used to list nine flags mxcli could not render. Eight of them it now does; `markAsUsed` is the
@@ -381,8 +404,11 @@ real observation.
 
 ### Still true, re-confirmed on v0.26
 
-- `mxcli describe module X` emits only `create module X;` plus module roles — **79 bytes** for a
-  module holding 8 microflows, 3 entities and 2 pages. MDL is per-document.
+- ~~`mxcli describe module X` emits only `create module X;` plus module roles~~ — **true through
+  v0.26** (79 bytes for a module holding 8 microflows, 3 entities and 2 pages), **false on
+  v0.27**: `describe module X --all` dumps every document type, nanoflows, snippets, JavaScript
+  actions, mappings, task queues and image collections included. The bare form is unchanged, so
+  a script that relied on it still works. See "Changed on v0.27" above.
 - **mxlint drops `Flows:` entirely.** Zero occurrences in every microflow YAML of both projects.
   Its only ordering is the flat `pseudocode` scalar, which uses `GOTO L003` labels and elides
   action bodies to `// action: Microflows$DeleteAction`.
