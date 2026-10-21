@@ -212,6 +212,28 @@ Leave `@position` alone unless you are placing every statement. The builder lays
 by itself, and the grammar is blunt about the half-measure — *"Prefer no @position at all to a
 few"* — because a hand-placed statement is never moved to fit what gets built around it.
 
+**A commit whose object stays on screen needs `REFRESH`.** "Refresh in client" defaults to **No**
+on every activity — `mxcli syntax microflow object-operations` prints the table — so a flow called
+from a button persists its change and leaves the client rendering what it had. The user clicks,
+the database changes, and nothing on the page moves.
+
+Measured: two flows toggling a flag from the grid on an overview page ended `COMMIT $List;`. The
+flag flipped in the database, the grid kept showing the old value, and both buttons read as
+broken. The fix is one keyword.
+
+```sql
+LOOP $Iterator IN $List BEGIN
+  CHANGE $Iterator (<Module>.<Entity>.SendReminders = true);  -- qualified: see 3b
+END LOOP;
+COMMIT $List REFRESH;             -- REFRESH: repaint the grid behind the button
+```
+
+The test is **"is the object still on screen when this flow returns?"** If yes, write `REFRESH`.
+That covers everything called from a page: a grid-row button, a page-level action, a toggle on
+the object the page is showing. Leave it off when the flow navigates away or closes the page, and
+say in one line why. `REFRESH` is also available on `DELETE` and `ROLLBACK`, and the same test
+applies to both.
+
 **3b. Grep the file for what matters, before running it.**
 
 ```bash
@@ -551,6 +573,10 @@ Specifically, do not assume any of these, all of which held in that run:
 - **Never resend an MCP call that timed out or returned nothing.** The outcome is unknown, not
   failed — a retry races the call still running, and three of them corrupted a 6.8 MB page.
   Stop, say the state is unknown, and ask the developer to look at that document (§34).
+- **`COMMIT` without `REFRESH` on an object the user is still looking at.** Refresh in client
+  defaults to No, so the write lands and the page keeps showing the old value — the feature works
+  and the button looks broken. Write `REFRESH` on anything called from a page unless the flow
+  navigates away (Step 3a).
 - Only ever author into modules the project owns. Never write a Marketplace module.
 - Never run the app, never deploy, never touch Mendix Cloud.
 - If a step cannot be done, that is a result. Report it and carry on with the steps that do not

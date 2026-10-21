@@ -338,6 +338,15 @@ Evidence over impression: quote the diff hunk.
   actually consumed.
 - **Ignored return values** — a `$Success = call microflow ...` that is never tested.
 - **Retrieves with `limit 1` and no sort** — non-deterministic if more than one row can match.
+- **A commit the user is looking at, with no `REFRESH`.** "Refresh in client" defaults to **No**
+  on every activity, so `COMMIT $X;` in a flow reached from a page button persists the change and
+  leaves the client showing the old value. This is the defect class most likely to survive the
+  developer's own testing and be reported by a user instead: the database is correct, the logic is
+  correct, and the screen says nothing happened. Flag `COMMIT`, `DELETE` or `ROLLBACK` without
+  `REFRESH` in any microflow reachable from a page, unless the flow navigates away or closes the
+  page — then say which, so the reader knows it was checked rather than missed. Seen live: two
+  flows toggling a flag from an overview grid, both ending `COMMIT $List;`, both reported as
+  broken buttons.
 
 **Data and deployment**
 - **Domain model changes** mean migration. Check `persistent entity` in
@@ -355,7 +364,8 @@ Evidence over impression: quote the diff hunk.
 
 **Security and UX**
 - `AllowedModuleRoles` added/removed on microflows and pages; changed entity access rules.
-- `Commit: "No"` / `RefreshInClient: false` on actions whose results the user should see.
+- `Commit: "No"` / `RefreshInClient: false` on actions whose results the user should see — the
+  missing-`REFRESH` entry under Logic defects is the common form, and the one worth hunting.
 - Widgets flipping `Editable: Never -> Always`, especially on compliance or audit fields.
 
 **Process**
