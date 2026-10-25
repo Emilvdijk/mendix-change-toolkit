@@ -185,7 +185,7 @@ Because none of them are reads of the model:
 | **`ped_check_errors`** | Runs **Studio Pro's own consistency check** against the live model, per document. mxcli's `check` validates MDL scripts and `lint` runs rule packs; neither is Studio Pro's validator. Returns `No errors found.` or just the failing documents |
 | **`search_mendix_knowledge_base`** | Official Mendix documentation, retrieved and ranked. One query on OQL view entities returned **56 KB** including the View Entities refguide page. Neither CLI ships docs |
 | **`read_skill`** | Mendix's **own authoring conventions**, maintained upstream — `microflow-common` is 5.5 KB of naming rules, happy-path/alternative layout and spacing formulas. There is no other copy of this |
-| **`oql_generate`** | Generates OQL against a named module's real domain model; with `documentName` it writes straight into a `ViewEntitySourceDocument` |
+| **`oql_generate`** | Generates OQL against a named module's real domain model; with `documentName` it writes straight into a `ViewEntitySourceDocument`. **Generative, and the write fires on whatever it produced** — it is for drafting a query you do not have, never for writing back one you do. To write known OQL verbatim, `ped_update_document` sets `/oql` on that same document (§36 of `WRITING-TO-THE-MODEL.md`) |
 | **Writing the model** | 6 tools. The only agent-driven authoring path that exists. Out of scope for this read-only toolkit, but it is the headline capability |
 
 So the division is cleaner than "which reader is best": **mxcli and mxlint read the model; the MCP

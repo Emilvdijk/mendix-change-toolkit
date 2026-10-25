@@ -1367,6 +1367,103 @@ left alone, and `create module role M.User` adopts one.
   file as `mdl 0`, so every script in this toolkit runs as written. `describe` emits an `mdl 1;`
   header, which means a describe → exec round-trip is now explicitly versioned.
 
+## 36. A view entity's OQL has a verbatim writer. `oql_generate` is not it.
+
+Measured 2026-10-25 against a live Studio Pro 11.12.4 on a 42-module app, on a scratch view
+entity that happened to carry the hard construct. This section exists because a build reached for
+the generative tool, it timed out, and it left a 300-line production view holding nothing but its
+comment block.
+
+### What went wrong first
+
+A build needed to edit one UNION branch of a large hand-written view. Neither obvious path worked:
+
+- **mxcli cannot round-trip such a view.** `describe entity` emits the OQL happily; `check` then
+  refuses its own output. The gap is narrow and exact — `on` is accepted after an *entity* join
+  and not after an *association-path* join:
+
+  ```sql
+  mdl 1;
+  create or modify view entity M.V (A: Long) as (
+    from M.E as e
+    inner join e/M.E_F/M.F as f on not f.Flag    -- mismatched input 'on'
+    select e.ID as A                             -- expecting {GROUP_BY, SELECT, WHERE, HAVING}
+  );
+  ```
+
+  Drop the `on`, or use `inner join M.F as f on f.EId = e.ID`, and it parses. Mendix accepts both
+  forms, so this is an mxcli defect, not a Mendix restriction.
+
+- **`oql_generate` was then used to write the finished text back.** It timed out after **30.7
+  seconds** and the view was left containing only its leading comment. The developer rolled it back.
+
+### Why that was the wrong tool, and it says so itself
+
+`oql_generate` is **generative**. Its own description: *"Generates an OQL query for a given module
+and natural-language intent"*, and of `documentName`: *"When set, oql_generate writes the result
+directly."* Passing ~12 KB of finished OQL as `currentOql` with an intent of "reproduce this
+exactly" asks a model to echo 12 KB character-perfect inside a client timeout — and the write
+fires on whatever it produced, including nothing.
+
+**Use `oql_generate` to draft a query you do not have. Never to write one you already have.**
+
+### The verbatim writer
+
+A view's OQL is a plain string property on its source document, and `ped_update_document` sets it:
+
+```
+ped_update_document(
+  documentName: "M.MyView",
+  documentType: "DomainModels$ViewEntitySourceDocument",
+  operations: [{ path: "/oql", operation: { type: "set", value: "<the OQL, verbatim>" } }]
+)
+```
+
+Measured: 1,401 bytes written **instantly**, read back **byte-identical** (sha256 matched on both
+sides), and it carried the association-path join with `on not exists (…)` that mxcli's grammar
+rejects. No generation, no timeout exposure, no partial write. Keep `\r\n` line endings — that is
+what Studio Pro stores.
+
+### The boundary that actually matters: the attribute list is a separate structure
+
+The OQL text and the entity's attributes are two different things, and only one of them is
+writable by tool. Each row below was measured, and each verdict was checked with
+`ped_check_errors` on the module's domain model:
+
+| Edit shape | `/oql` write | Entity sync | Verdict |
+|---|---|---|---|
+| No column change — joins, expressions, `where`, formatting | ✅ | ✅ stays clean | **one call, done** |
+| Removes a column | ✅ | ✅ clean once the attribute is removed too | **two calls, done** |
+| Adds a column | ✅ | ❌ **cannot be made clean by tool** | the OQL lands; a person clicks Synchronize |
+
+**The add case is conclusive, not a near miss.** An attribute was deleted and then recreated — the
+same name, `DomainModels$StringAttributeType`, `String(200)`, `value: DomainModels$OqlViewValue`,
+same position, structurally identical to the one that had been in sync two minutes earlier — and
+the module still reported *"View Entity is out of sync with the OQL Query"*. The binding between
+an attribute and its OQL column is something only Studio Pro's own synchronize creates, and no
+MCP tool exposes it.
+
+Two traps on the way there, both worth knowing before you spend calls on them:
+
+- `add` on `/entities/N/attributes` is locked to the **constructor** schema (`name`, `type`,
+  `enumerationName`). It cannot express `value`, so it silently creates a stored-value attribute.
+  Adding and then `set`ting `/value` to `OqlViewValue` produces the right shape and still does not
+  satisfy the check.
+- It is **not** a dirty flag. A purely cosmetic edit — a capitalisation change and one extra space
+  of indent, same columns — left the module clean. The check is a real comparison of the derived
+  column list, which is exactly why a column you add by hand cannot satisfy it.
+
+### The rule
+
+1. Editing an existing view? **`ped_update_document` set `/oql`.** Never `oql_generate`.
+2. Work out first whether the edit changes the **select column list**. That single question decides
+   whether this is a one-call job or a job that ends with a person.
+3. An edit confined to one branch of a `UNION` **cannot** change the column list — every branch
+   must expose the same columns. Those edits are always row 1.
+4. Adding a column: write the OQL, then stop and say that the view needs Synchronize in Studio Pro.
+   Do not hand-build the attribute; it will not clear the error and it leaves the model dirty.
+5. Still never resend a call that timed out (§34). A timeout here destroyed a view's contents.
+
 ## Status of this run — complete
 
 **The app runs without error and the widget works.** Nine model documents plus the stylesheet:

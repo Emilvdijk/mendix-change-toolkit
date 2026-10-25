@@ -147,6 +147,9 @@ report which row you corrected:
 | Repoint pages onto a different layout | mxcli — `ALTER PAGE … SET Layout = M.L [MAP (Old AS New)]`, or `ALTER PAGES [IN <module>] SET LAYOUT = … WHERE LAYOUT = …` for the bulk form |
 | Layout: drop a layout-grid COLUMN | **unverified on v0.26** — refused on v0.24, but the spelling changed from `drop widget col3` to `DROP col3`, so the old error is no longer evidence. Try it; if it refuses, it is a person's job |
 | **Rename** a layout | **a person** — `mxcli rename` still has no layout type (re-checked on v0.26: eleven types, layout is not one), and a rename is the only thing that updates the references |
+| **View entity: edit an existing OQL** | **MCP `ped_update_document`, `set` on `/oql`** of the `DomainModels$ViewEntitySourceDocument` — verbatim, instant, and it takes OQL mxcli cannot parse. **Never `oql_generate`**: that one generates, writes whatever it produced, and timed out leaving a view empty (§36) |
+| **View entity: an edit that ADDS a select column** | mxcli or the MCP writes the OQL; **a person** then clicks Synchronize. The attribute↔column binding cannot be created by tool — a hand-built attribute identical to a working one still reads "out of sync" (§36) |
+| **View entity: a new one** | mxcli — unless the OQL needs `on` after an association-path join (`inner join a/M.Assoc/M.E as x on …`), which mxcli's grammar rejects. Then write the document and set `/oql` over the MCP |
 | Remove a module | **a person** in Studio Pro — and see Step 3f, it leaves the user roles behind |
 | **Install** a Marketplace module | **a person** — `install_marketplace_module` needs a Marketplace version UUID and nothing exposed resolves one (§28) |
 | `CE0463` "the definition of this widget has changed", after an import | **a person**: "Update all widgets" in Studio Pro. No tool clears it, and the errors are inside a `writable: false` module anyway (§28) |
@@ -603,6 +606,11 @@ Specifically, do not assume any of these, all of which held in that run:
   defaults to No, so the write lands and the page keeps showing the old value — the feature works
   and the button looks broken. Write `REFRESH` on anything called from a page unless the flow
   navigates away (Step 3a).
+- **Never write a view entity's OQL with `oql_generate`.** It generates, and it writes whatever it
+  generated — asked to reproduce a finished 12 KB query it timed out and left the view holding only
+  its comment block. `ped_update_document` set `/oql` writes the text verbatim and instantly.
+  Before you start, ask whether the edit changes the **select column list**: if it does not, one
+  call finishes it; if it adds a column, the OQL lands but a person has to click Synchronize (§36).
 - Only ever author into modules the project owns. Never write a Marketplace module.
 - Never run the app, never deploy, never touch Mendix Cloud.
 - If a step cannot be done, that is a result. Report it and carry on with the steps that do not

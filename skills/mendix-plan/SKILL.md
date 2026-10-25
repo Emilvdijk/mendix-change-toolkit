@@ -78,6 +78,8 @@ So, in **Documents to change**, mark each row with who can author it:
 | `SampleApp.Snippet_Foo` | yes | mxcli or MCP |
 | `SampleApp.App_Default` (a layout you own) | yes | mxcli `ALTER LAYOUT` — v0.26, unproven here |
 | `SomeMarketplace.SomeLayout` | **no** | **a person in Studio Pro** |
+| `SampleApp.MyView` (view entity, OQL edit) | yes | MCP `ped_update_document` set `/oql` — **not `oql_generate`**, which is generative and has emptied a view |
+| `SampleApp.MyView`, where the edit **adds a select column** | yes | MCP writes the OQL; **a person** clicks Synchronize. No tool can bind a new attribute to its column |
 
 A plan that ends with "and then a person adds one widget call in Studio Pro" is a *better* plan
 than one that discovers it at the last step. Say it in **Approach**, not only in the table.

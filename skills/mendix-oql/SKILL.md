@@ -58,6 +58,31 @@ with `documentName` set it writes the result straight into a ViewEntitySourceDoc
 output as a draft to check against the rules in this skill, not as an answer — and never pass
 `documentName` unless the user has asked for the document to be written.
 
+**It is generative, and the write fires on whatever it produced.** Measured 2026-10-25: asked to
+write back a finished ~12 KB query verbatim, it timed out after 30.7 s and left a 300-line
+production view containing only its comment block. Use it to draft a query nobody has yet; never
+to write back one you already have.
+
+**To write OQL you already have, set the property directly** — verbatim, instant, and it accepts
+queries mxcli's grammar cannot parse (an association-path join with `on`):
+
+```
+ped_update_document(
+  documentName: "M.MyView",
+  documentType: "DomainModels$ViewEntitySourceDocument",
+  operations: [{ path: "/oql", operation: { type: "set", value: "<the OQL>" } }]
+)
+```
+
+Keep `\r\n` line endings; that is what Studio Pro stores. One caveat, and it decides whether the
+job finishes: the entity's **attribute list is a separate structure**. An edit that leaves the
+select columns alone (joins, expressions, `where`, formatting — and anything confined to one
+`UNION` branch, since every branch must expose the same columns) is done in that one call. An edit
+that **removes** a column also needs its attribute removed. An edit that **adds** a column writes
+fine and then cannot be synchronised by any tool — a hand-built attribute identical to a working
+one still reads "View Entity is out of sync with the OQL Query". Say so and let a person click
+Synchronize.
+
 ## Output rules (hard)
 
 - **Never deliver OQL as a file.** Output the query as raw text in a single code block the user
