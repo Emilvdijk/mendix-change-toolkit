@@ -1,0 +1,5 @@
+{
+  "name": "mendix",
+  "version": "1.0.0",
+  "description": "Mendix change toolkit: scout, plan, build, review, test instructions and change notes. Loaded per session with --plugin-dir (Dash does this for its own agents) instead of being installed into ~/.claude/skills."
+}

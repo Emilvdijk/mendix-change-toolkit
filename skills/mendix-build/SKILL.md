@@ -192,18 +192,41 @@ Two conventions, both `@` annotations from `mxcli syntax microflow.layout`, both
 - **A long condition gets a short caption.** `@caption 'text'` on an `IF` is what the decision
   shows on the canvas. Leave it off and Studio Pro draws the whole expression inside the
   diamond, so a three-clause condition becomes a shape nobody can read at normal zoom. The
-  expression stays exact; the caption is for a person.
+  expression stays exact; the caption is for a person. Write it as the question the expression
+  answers, a few words long (`'Reverted?'`, `'Ready to attach?'`). A condition short enough to
+  read in the diamond (`$SentCount > 0`) needs none.
 - **Only the happy path goes right. Every other outcome goes straight down.** Anchor the branch
   that carries the main line `(from: right, to: left)` and the rest `(from: bottom, to: top)`,
   so they drop into the lane below and run down until they meet a merge or the next decision.
   Diagonals are what you get when the anchors are left to chance, and a canvas of them cannot be
   read at a glance.
 
+**An annotation belongs to the statement that FOLLOWS it. Both go on the lines above the `IF`,
+never under `THEN`.**
+
 ```sql
+@caption 'Ready to attach?'
+@anchor(true: (from: right, to: left), false: (from: bottom, to: top))
 IF $Request/Status = Pending AND $Request/Attachment != empty AND $User/Active THEN
-  @caption 'Ready to attach?'
-  @anchor(true: (from: right, to: left), false: (from: bottom, to: top))
+  ...
+END IF;
 ```
+
+Written under `THEN` they annotate the first statement of the true branch instead, and nothing
+refuses it — `mxcli check` and `mx.exe check` both pass. Measured on CLE-734 (2026-11-11), where
+this section still showed them under `THEN`:
+
+- the decision kept its full expression in the diamond, and the **first activity of the branch**
+  took the caption: a Show message activity labelled `Reverted?`, which reads as if the activity
+  asks a question;
+- where the branch started with `RETURN`, the caption vanished without a word, because an end
+  event has none to carry;
+- the per-branch `@anchor` was lost the same way.
+
+So prove the placement in the read-back (3e), per captioned decision: `describe` must print
+`@caption` on the line **directly above** its `if`. A `@caption` printed as the first line
+inside a `then` block, or a caption that is in the script and absent from `describe`, is this
+mistake — fix the script and re-apply, do not report it as cosmetic.
 
 `@anchor` has a per-branch form; `@curve` does not — on a split it bends every outgoing edge and
 `@curve(true: ...)` is refused (MDL060) — so shape branches with anchors, never with curves. An
